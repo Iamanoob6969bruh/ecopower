@@ -9,10 +9,10 @@ import {
   YAxis,
   ReferenceLine
 } from "recharts";
-import { format, parseISO, startOfDay, addDays } from "date-fns";
+import { format, parseISO, subHours, addHours, startOfDay, addDays } from "date-fns";
 import { Activity } from "lucide-react";
 
-import { API_ENDPOINTS } from "@/lib/api";
+import { API_ENDPOINTS } from "../lib/api";
 
 export const LiveGraph = ({
   plant_id,
@@ -30,31 +30,26 @@ export const LiveGraph = ({
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    const fetchData = () => {
-      const now = new Date();
-      // Show from start of today until end of tomorrow to get the full prediction curve
-      const start = format(startOfDay(now), "yyyy-MM-dd'T'HH:mm:ss");
-      const end = format(addDays(startOfDay(now), 2), "yyyy-MM-dd'T'HH:mm:ss");
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const now = new Date();
+        // Rolling Window: 12 hours past to 12 hours future
+        const start = subHours(now, 12).toISOString();
+        const end = addHours(now, 12).toISOString();
 
-      fetch(`${API_ENDPOINTS.PLANT_GENERATION(plant_id)}?start=${start}&end=${end}`)
-        .then((res) => {
-          if (!res.ok) throw new Error("Not found");
-          return res.json();
-        })
-        .then((genData) => {
-          if (!genData || genData.length === 0) {
-            setData([]);
-            setLoading(false);
-            return;
-          }
-
-          const formatted = genData.map((d: any) => {
+        const response = await fetch(`${API_ENDPOINTS.PLANT_GENERATION(plant_id)}?start=${start}&end=${end}`);
+        if (!response.ok) throw new Error("Failed to fetch");
+        const raw = await response.json();
+        
+        if (raw && Array.isArray(raw)) {
+          const formatted = raw.map((d: any) => {
             const ts = parseISO(d.timestamp);
             return {
               ...d,
               timestampMs: ts.getTime(),
-              // Only show actual for past/present
-              actual_kw: (d.actual_kw !== null && ts.getTime() <= now.getTime() + 15 * 60 * 1000) ? d.actual_kw : null,
+              // Show actual if it exists in the database
+              actual_kw: d.actual_kw !== null ? d.actual_kw : null,
               predicted_kw: d.predicted_kw !== null ? d.predicted_kw : null,
             };
           });
@@ -76,13 +71,13 @@ export const LiveGraph = ({
             onDataUpdate({ peak, avg, totalEnergyMWh });
           }
 
-          setLoading(false);
-        })
-        .catch((e) => {
-          console.error(e);
-          setError(true);
-          setLoading(false);
-        });
+        }
+      } catch (e) {
+        console.error(e);
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchData();

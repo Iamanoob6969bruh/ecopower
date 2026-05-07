@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { API_ENDPOINTS } from "@/lib/api";
+import { parseISO, format, subHours, addHours } from "date-fns";
+import { API_ENDPOINTS } from "../lib/api";
 
 interface ForecastData {
-  hour: number;
+  time: string;
   solar: number;
   wind: number;
   solarF: number;
@@ -16,26 +17,23 @@ export const Forecast = () => {
   useEffect(() => {
     const fetchForecast = async () => {
       try {
-        const response = await fetch(`${API_ENDPOINTS.SLDC_GENERATION}?limit=24`);
+        setLoading(true);
+        const now = new Date();
+        const start = subHours(now, 12).toISOString();
+        const end = addHours(now, 12).toISOString();
+
+        const response = await fetch(`${API_ENDPOINTS.GENERATION_AGGREGATE}?start=${start}&end=${end}`);
         if (!response.ok) throw new Error("Backend unreachable");
         const raw = await response.json();
         if (!Array.isArray(raw)) throw new Error("Invalid data format");
 
-        // Reverse for chronological order
-        const sorted = [...raw].reverse();
-
-        const chartData = sorted.map((entry: any, i: number) => {
-          // Physics-based forecast simulation based on SLDC trend
-          const solarTrend = entry.solar_mw;
-          const windTrend = entry.wind_mw;
-
+        const chartData = raw.map((entry: any) => {
           return {
-            hour: i,
-            solar: solarTrend,
-            wind: windTrend,
-            // Generate future prediction with slight variance for realism
-            solarF: solarTrend * (0.98 + Math.random() * 0.05),
-            windF: windTrend * (0.95 + Math.random() * 0.1),
+            time: entry.timestamp_label || format(parseISO(entry.timestamp), "HH:mm"),
+            solar: (entry.solar_actual_kw || 0) / 1000,
+            wind: (entry.wind_actual_kw || 0) / 1000,
+            solarF: (entry.solar_predicted_kw || 0) / 1000,
+            windF: (entry.wind_predicted_kw || 0) / 1000,
           };
         });
         setData(chartData);
@@ -207,7 +205,7 @@ export const Forecast = () => {
                 y={PAD.t} width="150" height="80"
               >
                 <div className="bg-background/95 backdrop-blur-sm border border-border p-3 shadow-xl rounded-sm">
-                  <div className="font-mono text-[9px] text-muted-foreground mb-1">BLOCK {hoverIdx + 1}</div>
+                  <div className="font-mono text-[10px] text-primary mb-1">{data[hoverIdx].time}</div>
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-[10px] font-mono">Power Generated:</span>
                     <span className={`text-xs font-bold text-${accentColor}`}>{getValues(data[hoverIdx])[0].toFixed(2)} MW</span>

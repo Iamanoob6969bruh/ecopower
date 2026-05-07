@@ -21,7 +21,8 @@ def run_15min_job():
     try:
         plants = get_plants()
         now = datetime.now()
-        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        # Look back 24 hours and forward 24 hours to ensure no gaps at midnight
+        start_of_window = now - timedelta(hours=24)
         two_hours_ahead = now + timedelta(hours=24)
         
         for plant in plants:
@@ -40,7 +41,7 @@ def run_15min_job():
             # Filter to our window (Start of day to Now+24H)
             filtered_weather = {
                 ts: data for ts, data in weather_15min.items() 
-                if start_of_day <= datetime.fromisoformat(ts).replace(tzinfo=None) <= two_hours_ahead
+                if start_of_window <= datetime.fromisoformat(ts).replace(tzinfo=None) <= two_hours_ahead
             }
             
             if not filtered_weather:
@@ -88,7 +89,7 @@ def run_15min_job():
             db.execute(
                 delete(GenerationData).where(
                     GenerationData.plant_id == plant_id,
-                    GenerationData.timestamp >= start_of_day,
+                    GenerationData.timestamp >= start_of_window,
                     GenerationData.timestamp <= two_hours_ahead,
                     GenerationData.zone_label.in_(["zone2", "zone3"])
                 )

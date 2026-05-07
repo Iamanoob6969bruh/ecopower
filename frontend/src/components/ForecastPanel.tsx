@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { format } from "date-fns";
-import { API_ENDPOINTS } from "@/lib/api";
+import { format, subHours, addHours } from "date-fns";
+import { API_ENDPOINTS } from "../lib/api";
 
 const W = 1000;
 const H = 320;
@@ -14,8 +14,9 @@ export const ForecastPanel = () => {
     const fetchData = async () => {
       try {
         const now = new Date();
-        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-        const response = await fetch(`${API_ENDPOINTS.GENERATION_AGGREGATE}?start=${start}`);
+        const start = subHours(now, 12).toISOString();
+        const end = addHours(now, 12).toISOString();
+        const response = await fetch(`${API_ENDPOINTS.GENERATION_AGGREGATE}?start=${start}&end=${end}`);
         if (!response.ok) throw new Error("Failed to fetch");
         const raw = await response.json();
 
