@@ -12,7 +12,7 @@ import {
 import { format, parseISO, startOfDay, addDays } from "date-fns";
 import { Activity } from "lucide-react";
 
-import { API_ENDPOINTS } from "../lib/api";
+import { API_ENDPOINTS } from "@/lib/api";
 
 export const LiveGraph = ({
   plant_id,
@@ -32,9 +32,9 @@ export const LiveGraph = ({
   useEffect(() => {
     const fetchData = () => {
       const now = new Date();
-      // Rolling Window: 24 hours in the past, 24 hours in the future
-      const start = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-      const end = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+      // Show from start of today until end of tomorrow to get the full prediction curve
+      const start = format(startOfDay(now), "yyyy-MM-dd'T'HH:mm:ss");
+      const end = format(addDays(startOfDay(now), 2), "yyyy-MM-dd'T'HH:mm:ss");
 
       fetch(`${API_ENDPOINTS.PLANT_GENERATION(plant_id)}?start=${start}&end=${end}`)
         .then((res) => {
@@ -198,19 +198,6 @@ export const LiveGraph = ({
               connectNulls={true}
             />
 
-            <ReferenceLine
-              x={new Date().getTime()}
-              stroke="hsl(var(--primary))"
-              strokeDasharray="3 3"
-              label={{
-                value: 'NOW',
-                position: 'top',
-                fill: 'hsl(var(--primary))',
-                fontFamily: 'JetBrains Mono',
-                fontSize: 9
-              }}
-            />
-            
             <Area
               type="monotone"
               dataKey="actual_kw"

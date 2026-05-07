@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { AlertCircle, ArrowDown, ArrowUp, Activity, Sun, Wind, Cloud, Zap, ShieldAlert } from "lucide-react";
 import { format } from "date-fns";
-import { API_ENDPOINTS, getBaseUrl } from "../lib/api";
+import { API_ENDPOINTS, getBaseUrl } from "@/lib/api";
 
 interface AnalysisEntry {
   timestamp: string;
