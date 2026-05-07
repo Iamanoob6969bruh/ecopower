@@ -95,7 +95,7 @@ cd eco-power
 ```bash
 cd backend
 pip install -r requirements.txt
-python -m src.api.main  # Runs on port 8080
+python main.py            # Unified server on port 8000
 ```
 
 ### 3. Frontend Installation
