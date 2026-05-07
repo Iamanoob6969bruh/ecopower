@@ -32,10 +32,12 @@ export const LiveGraph = ({
   useEffect(() => {
     const fetchData = () => {
       const now = new Date();
-      // Look back exactly 24 hours from right now
-      const start = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+      // ROLLING WINDOW: Show from 12 hours ago until 12 hours from now
+      // This ensures the graph is never blank at midnight.
+      const start = format(new Date(now.getTime() - 12 * 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm:ss");
+      const end = format(new Date(now.getTime() + 12 * 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm:ss");
 
-      fetch(`${API_ENDPOINTS.PLANT_GENERATION(plant_id)}?start=${start}`)
+      fetch(`${API_ENDPOINTS.PLANT_GENERATION(plant_id)}?start=${start}&end=${end}`)
         .then((res) => {
           if (!res.ok) throw new Error("Not found");
           return res.json();
