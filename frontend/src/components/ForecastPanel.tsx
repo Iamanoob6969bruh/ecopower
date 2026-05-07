@@ -14,7 +14,7 @@ export const ForecastPanel = () => {
     const fetchData = async () => {
       try {
         const now = new Date();
-        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+        const start = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
         const response = await fetch(`${API_ENDPOINTS.GENERATION_AGGREGATE}?start=${start}`);
         if (!response.ok) throw new Error("Failed to fetch");
         const raw = await response.json();

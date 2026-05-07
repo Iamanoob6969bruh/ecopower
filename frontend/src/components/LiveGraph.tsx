@@ -32,11 +32,10 @@ export const LiveGraph = ({
   useEffect(() => {
     const fetchData = () => {
       const now = new Date();
-      // Show from start of today until end of tomorrow to get the full prediction curve
-      const start = format(startOfDay(now), "yyyy-MM-dd'T'HH:mm:ss");
-      const end = format(addDays(startOfDay(now), 2), "yyyy-MM-dd'T'HH:mm:ss");
+      // Look back exactly 24 hours from right now
+      const start = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
 
-      fetch(`${API_ENDPOINTS.PLANT_GENERATION(plant_id)}?start=${start}&end=${end}`)
+      fetch(`${API_ENDPOINTS.PLANT_GENERATION(plant_id)}?start=${start}`)
         .then((res) => {
           if (!res.ok) throw new Error("Not found");
           return res.json();
