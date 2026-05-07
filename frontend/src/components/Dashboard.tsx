@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Sun, Wind, Activity, TrendingUp } from "lucide-react";
+import { API_ENDPOINTS } from "@/lib/api";
 
 interface GridStatus {
   solar_mw: number;
@@ -18,19 +19,19 @@ export const Dashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       // Fetch SLDC status
-      fetch("http://localhost:8080/sldc/status")
+      fetch(API_ENDPOINTS.SLDC_STATUS)
         .then(res => res.json())
         .then(data => setStatus(data))
         .catch(err => console.warn("SLDC status unavailable"));
 
       // Fetch Solar Total
-      fetch("http://localhost:8000/api/summary/total/solar")
+      fetch(API_ENDPOINTS.SOLAR_TOTAL)
         .then(res => res.json())
         .then(data => setSolarTotal(data.total_mwh))
         .catch(err => console.warn("Solar summary unavailable"));
 
       // Fetch Wind Total
-      fetch("http://localhost:8000/api/summary/total/wind")
+      fetch(API_ENDPOINTS.WIND_TOTAL)
         .then(res => res.json())
         .then(data => setWindTotal(data.total_mwh))
         .catch(err => console.warn("Wind summary unavailable"));

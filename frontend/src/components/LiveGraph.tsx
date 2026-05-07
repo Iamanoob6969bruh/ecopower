@@ -12,6 +12,8 @@ import {
 import { format, parseISO, startOfDay, addDays } from "date-fns";
 import { Activity } from "lucide-react";
 
+import { API_ENDPOINTS } from "@/lib/api";
+
 export const LiveGraph = ({
   plant_id,
   capacity_mw,
@@ -34,7 +36,7 @@ export const LiveGraph = ({
       const start = format(startOfDay(now), "yyyy-MM-dd'T'HH:mm:ss");
       const end = format(addDays(startOfDay(now), 2), "yyyy-MM-dd'T'HH:mm:ss");
 
-      fetch(`http://localhost:8000/api/generation/${plant_id}?start=${start}&end=${end}`)
+      fetch(`${API_ENDPOINTS.PLANT_GENERATION(plant_id)}?start=${start}&end=${end}`)
         .then((res) => {
           if (!res.ok) throw new Error("Not found");
           return res.json();

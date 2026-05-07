@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { API_ENDPOINTS } from "@/lib/api";
 
 interface ForecastData {
   hour: number;
@@ -15,7 +16,7 @@ export const Forecast = () => {
   useEffect(() => {
     const fetchForecast = async () => {
       try {
-        const response = await fetch("http://localhost:8080/sldc/generation?limit=24");
+        const response = await fetch(`${API_ENDPOINTS.SLDC_GENERATION}?limit=24`);
         if (!response.ok) throw new Error("Backend unreachable");
         const raw = await response.json();
 

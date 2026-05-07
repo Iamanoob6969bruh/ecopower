@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { AlertCircle, ArrowDown, ArrowUp, Activity, Sun, Wind, Cloud, Zap, ShieldAlert } from "lucide-react";
 import { format } from "date-fns";
+import { API_ENDPOINTS, getBaseUrl } from "@/lib/api";
 
 interface AnalysisEntry {
   timestamp: string;
@@ -22,7 +23,7 @@ export const Analysis = () => {
       try {
         const now = new Date();
         const start = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(); // Last 24h
-        const response = await fetch(`http://localhost:8000/api/generation/aggregate/all?start=${start}`);
+        const response = await fetch(`${API_ENDPOINTS.GENERATION_AGGREGATE}?start=${start}`);
         if (!response.ok) throw new Error("Backend unreachable");
         const raw = await response.json();
         

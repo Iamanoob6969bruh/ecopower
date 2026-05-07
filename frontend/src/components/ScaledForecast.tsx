@@ -10,6 +10,8 @@ import {
 } from "recharts";
 import { format, parseISO } from "date-fns";
 
+import { API_ENDPOINTS } from "@/lib/api";
+
 interface ScaledForecastProps {
   plant_id: string;
   name: string;
@@ -27,7 +29,7 @@ export const ScaledForecast = ({ plant_id, name, latitude, longitude, dc_capacit
     const fetchForecast = async () => {
       setLoading(true);
       try {
-        const response = await fetch("http://localhost:8000/api/live-prediction", {
+        const response = await fetch(API_ENDPOINTS.LIVE_PREDICTION, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
