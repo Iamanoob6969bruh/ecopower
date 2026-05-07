@@ -1,4 +1,5 @@
 import os
+import threading
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -7,7 +8,7 @@ import logging
 from src.data.database import init_db
 from src.api.routes import router as api_router
 from src.jobs.scheduler import start_scheduler
-# Import the SLDC app to unify them
+# Import SLDC app and its background scraper
 from src.api.main import app as sldc_app
 
 logging.basicConfig(level=logging.INFO)
@@ -24,6 +25,21 @@ async def lifespan(app: FastAPI):
     logger.info("Starting background scheduler...")
     global scheduler
     scheduler = start_scheduler()
+
+    # Manually trigger the SLDC scraper thread since 'mount' doesn't run it
+    from src.data.scraper import run_scrape
+    def _run_sldc_job():
+        while True:
+            try:
+                logger.info("Background SLDC sync starting...")
+                run_scrape()
+                logger.info("Background SLDC sync complete.")
+            except Exception as e:
+                logger.error(f"Background SLDC sync failed: {e}")
+            import time
+            time.sleep(600) # 10 mins
+    
+    threading.Thread(target=_run_sldc_job, daemon=True).start()
     
     yield
     
@@ -42,15 +58,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include prediction routes
-app.include_router(api_router, prefix="/api")
+# FIXED: Removed the redundant 'prefix="/api"' because it is already defined in routes.py
+app.include_router(api_router)
 
-# Mount or include SLDC routes
-# Since src.api.main:app has its own routes, we can just include them
-app.mount("/sldc_service", sldc_app) 
-# OR more simply, we can just copy the critical SLDC routes or mount it at root
-# Let's mount the SLDC app so /sldc/status becomes /sldc/status
-app.mount("", sldc_app)
+# Mount the SLDC app for /sldc/... routes
+app.mount("/", sldc_app)
 
 if __name__ == "__main__":
     import uvicorn

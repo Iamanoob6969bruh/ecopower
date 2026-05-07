@@ -26,7 +26,7 @@ export const Analysis = () => {
         const response = await fetch(`${API_ENDPOINTS.GENERATION_AGGREGATE}?start=${start}`);
         if (!response.ok) throw new Error("Backend unreachable");
         const raw = await response.json();
-        
+
         // Take last 24 entries and reverse for newest first
         setData(raw.slice(-24).reverse());
       } catch (error) {
@@ -51,19 +51,19 @@ export const Analysis = () => {
 
   const calculateStats = () => {
     if (data.length === 0) return { stability: "99.8%", deviation: "0.42%", compliance: "100%" };
-    
+
     const errors = data.map(d => {
-        const actual = d.solar_actual_kw + d.wind_actual_kw;
-        const predicted = d.solar_predicted_kw + d.wind_predicted_kw;
-        return predicted > 0 ? Math.abs(actual - predicted) / predicted : 0;
+      const actual = d.solar_actual_kw + d.wind_actual_kw;
+      const predicted = d.solar_predicted_kw + d.wind_predicted_kw;
+      return predicted > 0 ? Math.abs(actual - predicted) / predicted : 0;
     });
-    
+
     const avgError = errors.reduce((a, b) => a + b, 0) / errors.length;
     const stability = (100 - avgError * 10).toFixed(1) + "%";
     const deviation = (avgError * 100).toFixed(2) + "%";
     const anomalies = data.filter(d => d.anomalies && d.anomalies.length > 0).length;
     const compliance = (((data.length - anomalies) / data.length) * 100).toFixed(0) + "%";
-    
+
     return { stability, deviation, compliance };
   };
 
@@ -105,92 +105,92 @@ export const Analysis = () => {
                 const totalPredicted = (entry.solar_predicted_kw + entry.wind_predicted_kw) / 1000;
                 const status = getStatus(totalActual, totalPredicted);
                 const hasAnomalies = entry.anomalies && entry.anomalies.length > 0;
-                
+
                 return (
                   <tr key={idx} className="border-b border-border/50 hover:bg-accent/5 transition-colors">
                     <td className="p-4 text-muted-foreground whitespace-nowrap">
-                        {format(new Date(entry.timestamp), "HH:mm")}
-                        <div className="text-[9px] opacity-50">{format(new Date(entry.timestamp), "MMM dd")}</div>
+                      {format(new Date(entry.timestamp), "HH:mm")}
+                      <div className="text-[9px] opacity-50">{format(new Date(entry.timestamp), "MMM dd")}</div>
                     </td>
                     <td className="p-4">
-                        <div className="flex items-center gap-2">
-                            {entry.weather?.ghi > 500 ? <Sun className="w-4 h-4 text-solar" /> : 
-                             entry.weather?.wind_speed > 10 ? <Wind className="w-4 h-4 text-wind" /> : 
-                             <Cloud className="w-4 h-4 text-muted-foreground" />}
-                            <span className="text-[10px] text-muted-foreground uppercase">
-                                {entry.weather?.ghi ? `${entry.weather.ghi} W/m²` : "Nominal"}
-                            </span>
-                        </div>
+                      <div className="flex items-center gap-2">
+                        {entry.weather?.ghi > 500 ? <Sun className="w-4 h-4 text-solar" /> :
+                          entry.weather?.wind_speed > 10 ? <Wind className="w-4 h-4 text-wind" /> :
+                            <Cloud className="w-4 h-4 text-muted-foreground" />}
+                        <span className="text-[10px] text-muted-foreground uppercase">
+                          {entry.weather?.ghi ? `${entry.weather.ghi} W/m²` : "Nominal"}
+                        </span>
+                      </div>
                     </td>
                     <td className="p-4 text-center">{(entry.solar_actual_kw / 1000).toFixed(2)}</td>
                     <td className="p-4 text-center">{(entry.wind_actual_kw / 1000).toFixed(2)}</td>
                     <td className="p-4 text-center">
-                        <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${status.bg} ${status.color}`}>
-                            {status.label}
-                        </div>
+                      <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${status.bg} ${status.color}`}>
+                        {status.label}
+                      </div>
                     </td>
                     <td className="p-4">
-                        {hasAnomalies ? (
-                            <div className="space-y-1">
-                                {entry.anomalies.map((a: any, i: number) => (
-                                    <div key={i} className="flex items-center gap-1.5 text-[10px] font-bold text-destructive uppercase">
-                                        <ShieldAlert className="w-3 h-3" />
-                                        {a.plant_id.replace(/_/g, ' ')}
-                                        <span className="opacity-70">({a.deviation}%)</span>
-                                    </div>
-                                ))}
+                      {hasAnomalies ? (
+                        <div className="space-y-1">
+                          {entry.anomalies.map((a: any, i: number) => (
+                            <div key={i} className="flex items-center gap-1.5 text-[10px] font-bold text-destructive uppercase">
+                              <ShieldAlert className="w-3 h-3" />
+                              {a.plant_id.replace(/_/g, ' ')}
+                              <span className="opacity-70">({a.deviation}%)</span>
                             </div>
-                        ) : (
-                            <span className="text-[10px] text-muted-foreground italic">No plant-level alerts</span>
-                        )}
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground italic">No plant-level alerts</span>
+                      )}
                     </td>
                     <td className="p-4 max-w-md">
                       <div className="flex items-start gap-2">
                         <Activity className={`w-3.5 h-3.5 mt-0.5 ${hasAnomalies ? "text-destructive" : status.color}`} />
                         <div>
-                            <div className={`text-[11px] leading-relaxed italic ${hasAnomalies ? "text-destructive font-semibold" : ""}`}>
-                                {hasAnomalies ? entry.anomalies[0].cause : entry.reason}
-                            </div>
-                            {entry.weather && Object.keys(entry.weather).length > 0 && (
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 p-2 bg-accent/5 border border-border/30 rounded-sm">
-                                    {entry.weather.ghi !== undefined && (
-                                        <div className="flex justify-between text-[9px] text-muted-foreground uppercase tracking-wider">
-                                            <span>GHI:</span>
-                                            <span className="font-bold text-solar">{entry.weather.ghi} W/m²</span>
-                                        </div>
-                                    )}
-                                    {entry.weather.wind_speed !== undefined && (
-                                        <div className="flex justify-between text-[9px] text-muted-foreground uppercase tracking-wider">
-                                            <span>Wind:</span>
-                                            <span className="font-bold text-wind">{entry.weather.wind_speed} m/s</span>
-                                        </div>
-                                    )}
-                                    {entry.weather.temp !== undefined && (
-                                        <div className="flex justify-between text-[9px] text-muted-foreground uppercase tracking-wider">
-                                            <span>Temp:</span>
-                                            <span className="font-bold">{entry.weather.temp}°C</span>
-                                        </div>
-                                    )}
-                                    {entry.weather.humidity !== undefined && (
-                                        <div className="flex justify-between text-[9px] text-muted-foreground uppercase tracking-wider">
-                                            <span>Hum:</span>
-                                            <span className="font-bold">{entry.weather.humidity}%</span>
-                                        </div>
-                                    )}
-                                    {entry.weather.clouds !== undefined && (
-                                        <div className="flex justify-between text-[9px] text-muted-foreground uppercase tracking-wider">
-                                            <span>Cloud:</span>
-                                            <span className="font-bold">{entry.weather.clouds}%</span>
-                                        </div>
-                                    )}
-                                    {entry.weather.pressure !== undefined && (
-                                        <div className="flex justify-between text-[9px] text-muted-foreground uppercase tracking-wider">
-                                            <span>Pres:</span>
-                                            <span className="font-bold">{entry.weather.pressure} hPa</span>
-                                        </div>
-                                    )}
+                          <div className={`text-[11px] leading-relaxed italic ${hasAnomalies ? "text-destructive font-semibold" : ""}`}>
+                            {hasAnomalies ? entry.anomalies[0].cause : entry.reason}
+                          </div>
+                          {entry.weather && Object.keys(entry.weather).length > 0 && (
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 p-2 bg-accent/5 border border-border/30 rounded-sm">
+                              {entry.weather.ghi !== undefined && (
+                                <div className="flex justify-between text-[9px] text-muted-foreground uppercase tracking-wider">
+                                  <span>GHI:</span>
+                                  <span className="font-bold text-solar">{entry.weather.ghi} W/m²</span>
                                 </div>
-                            )}
+                              )}
+                              {entry.weather.wind_speed !== undefined && (
+                                <div className="flex justify-between text-[9px] text-muted-foreground uppercase tracking-wider">
+                                  <span>Wind:</span>
+                                  <span className="font-bold text-wind">{entry.weather.wind_speed} m/s</span>
+                                </div>
+                              )}
+                              {entry.weather.temp !== undefined && (
+                                <div className="flex justify-between text-[9px] text-muted-foreground uppercase tracking-wider">
+                                  <span>Temp:</span>
+                                  <span className="font-bold">{entry.weather.temp}°C</span>
+                                </div>
+                              )}
+                              {entry.weather.humidity !== undefined && (
+                                <div className="flex justify-between text-[9px] text-muted-foreground uppercase tracking-wider">
+                                  <span>Hum:</span>
+                                  <span className="font-bold">{entry.weather.humidity}%</span>
+                                </div>
+                              )}
+                              {entry.weather.clouds !== undefined && (
+                                <div className="flex justify-between text-[9px] text-muted-foreground uppercase tracking-wider">
+                                  <span>Cloud:</span>
+                                  <span className="font-bold">{entry.weather.clouds}%</span>
+                                </div>
+                              )}
+                              {entry.weather.pressure !== undefined && (
+                                <div className="flex justify-between text-[9px] text-muted-foreground uppercase tracking-wider">
+                                  <span>Pres:</span>
+                                  <span className="font-bold">{entry.weather.pressure} hPa</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>

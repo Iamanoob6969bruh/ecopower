@@ -18,7 +18,7 @@ export const ForecastPanel = () => {
         const response = await fetch(`${API_ENDPOINTS.GENERATION_AGGREGATE}?start=${start}`);
         if (!response.ok) throw new Error("Failed to fetch");
         const raw = await response.json();
-        
+
         let cumulativeSolar = 0;
         let cumulativeWind = 0;
         let cumulativeSolarF = 0;
@@ -145,13 +145,13 @@ export const ForecastPanel = () => {
                 <stop offset="100%" stopColor="hsl(var(--wind))" stopOpacity="0" />
               </linearGradient>
             </defs>
-            
+
             <polygon points={buildArea("solar")} fill="url(#solarGrad)" />
             <polygon points={buildArea("wind")} fill="url(#windGrad)" />
-            
+
             <polyline points={buildLine("solar")} fill="none" stroke="hsl(var(--solar))" strokeWidth="2.5" />
             <polyline points={buildLine("wind")} fill="none" stroke="hsl(var(--wind))" strokeWidth="2.5" />
-            
+
             <polyline points={buildLine("solarF")} fill="none" stroke="hsl(var(--emerald))" strokeWidth="1.5" strokeDasharray="4 4" />
             <polyline points={buildLine("windF")} fill="none" stroke="hsl(var(--emerald))" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.6" />
           </svg>
@@ -162,7 +162,7 @@ export const ForecastPanel = () => {
           {(() => {
             const last = data[data.length - 1];
             const isAnomaly = last.solar < last.solarF * 0.9 || last.wind < last.windF * 0.9;
-            
+
             return (
               <>
                 <div>
@@ -171,26 +171,26 @@ export const ForecastPanel = () => {
                     {isAnomaly ? "Anomalies Detected" : "System Nominal"}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {isAnomaly 
+                    {isAnomaly
                       ? "Localized generation shortfall detected in cluster nodes. Efficiency below expected AI baseline."
                       : "All cluster nodes performing within 95% of AI predicted confidence interval."}
                   </p>
                 </div>
                 <div className="border-t border-border pt-5 space-y-4">
-                  <Row 
-                    label="Solar Performance" 
-                    value={`${((last.solar / (last.solarF || 1)) * 100).toFixed(1)}%`} 
-                    sub={last.solar < last.solarF * 0.9 ? "Underperforming · Inspect" : "Optimal Output"} 
+                  <Row
+                    label="Solar Performance"
+                    value={`${((last.solar / (last.solarF || 1)) * 100).toFixed(1)}%`}
+                    sub={last.solar < last.solarF * 0.9 ? "Underperforming · Inspect" : "Optimal Output"}
                   />
-                  <Row 
-                    label="Wind Efficiency" 
-                    value={`${((last.wind / (last.windF || 1)) * 100).toFixed(1)}%`} 
-                    sub={last.wind < last.windF * 0.9 ? "Low Velocity Capture" : "Stable Capture"} 
+                  <Row
+                    label="Wind Efficiency"
+                    value={`${((last.wind / (last.windF || 1)) * 100).toFixed(1)}%`}
+                    sub={last.wind < last.windF * 0.9 ? "Low Velocity Capture" : "Stable Capture"}
                   />
-                  <Row 
-                    label="Grid Impact" 
-                    value={isAnomaly ? "Moderate" : "Negligible"} 
-                    sub={isAnomaly ? "-1.2 MW Shortfall" : "Sync Optimized"} 
+                  <Row
+                    label="Grid Impact"
+                    value={isAnomaly ? "Moderate" : "Negligible"}
+                    sub={isAnomaly ? "-1.2 MW Shortfall" : "Sync Optimized"}
                   />
                 </div>
                 <div className={`border-t border-border pt-5 font-mono text-[10px] tracking-wider uppercase ${isAnomaly ? "text-destructive animate-pulse" : "text-muted-foreground"}`}>
