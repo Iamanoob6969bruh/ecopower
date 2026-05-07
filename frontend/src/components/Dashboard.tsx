@@ -49,7 +49,7 @@ export const Dashboard = () => {
     {
       icon: Sun,
       label: "Solar Output",
-      value: solarTotal !== null ? solarTotal.toLocaleString() : (status ? status.solar_mw.toFixed(1) : "—"),
+      value: (solarTotal !== null && solarTotal !== undefined) ? solarTotal.toLocaleString() : (status && status.solar_mw !== undefined && status.solar_mw !== null ? status.solar_mw.toFixed(1) : "—"),
       unit: "MWh",
       delta: "Cumulative Today",
       color: "solar"
@@ -57,7 +57,7 @@ export const Dashboard = () => {
     {
       icon: Wind,
       label: "Wind Output",
-      value: windTotal !== null ? windTotal.toLocaleString() : (status ? status.wind_mw.toFixed(1) : "—"),
+      value: (windTotal !== null && windTotal !== undefined) ? windTotal.toLocaleString() : (status && status.wind_mw !== undefined && status.wind_mw !== null ? status.wind_mw.toFixed(1) : "—"),
       unit: "MWh",
       delta: "Cumulative Today",
       color: "wind"
@@ -66,7 +66,7 @@ export const Dashboard = () => {
     {
       icon: Activity,
       label: "Frequency",
-      value: status ? status.frequency.toFixed(2) : "50.00",
+      value: (status && status.frequency !== undefined && status.frequency !== null) ? status.frequency.toFixed(2) : "50.00",
       unit: "Hz",
       delta: "Stable",
       color: "primary"

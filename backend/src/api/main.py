@@ -484,27 +484,33 @@ async def get_sldc_status():
         raise HTTPException(status_code=404, detail="SLDC database not found")
 
     try:
+        if not db_path.exists():
+            return {
+                "timestamp": "Initializing...", "scraped_at": datetime.now().isoformat(),
+                "frequency": 50.0, "state_ui_mw": 0, "state_demand_mw": 0,
+                "solar_mw": 0, "wind_mw": 0, "hydro_mw": 0, "thermal_mw": 0,
+                "thermal_ipp_mw": 0, "other_mw": 0, "pavagada_solar_mw": 0,
+                "live_generation_mw": 0, "ncep_mw": 0, "cgs_mw": 0, "is_stale": True
+            }
+
         con = sqlite3.connect(db_path)
-        default_query = """
-            SELECT *
-            FROM default_readings
-            ORDER BY scraped_at DESC
-            LIMIT 1
-        """
+        default_query = "SELECT * FROM default_readings ORDER BY scraped_at DESC LIMIT 1"
         default_df = pd.read_sql(default_query, con)
         
+        if default_df.empty:
+            con.close()
+            return {
+                "timestamp": "Syncing...", "scraped_at": datetime.now().isoformat(),
+                "frequency": 50.0, "state_ui_mw": 0, "state_demand_mw": 0,
+                "solar_mw": 0, "wind_mw": 0, "hydro_mw": 0, "thermal_mw": 0,
+                "thermal_ipp_mw": 0, "other_mw": 0, "pavagada_solar_mw": 0,
+                "live_generation_mw": 0, "ncep_mw": 0, "cgs_mw": 0, "is_stale": True
+            }
+
         # Get latest total generation from stategen_readings
-        gen_query = """
-            SELECT total_gen_mw, ncep_mw, cgs_mw
-            FROM stategen_readings
-            ORDER BY scraped_at DESC
-            LIMIT 1
-        """
+        gen_query = "SELECT total_gen_mw, ncep_mw, cgs_mw FROM stategen_readings ORDER BY scraped_at DESC LIMIT 1"
         gen_df = pd.read_sql(gen_query, con)
         con.close()
-
-        if default_df.empty:
-            raise HTTPException(status_code=404, detail="No SLDC data found")
 
         latest = default_df.iloc[0]
         status = {
@@ -521,7 +527,7 @@ async def get_sldc_status():
             "other_mw": latest["other_mw"],
             "pavagada_solar_mw": latest["pavagada_solar_mw"],
             "live_generation_mw": latest["total_generation_mw"] or (gen_df.iloc[0]["total_gen_mw"] if not gen_df.empty else 0),
-            "ncep_mw": latest["solar_mw"] + latest["wind_mw"],
+            "ncep_mw": (latest["solar_mw"] or 0) + (latest["wind_mw"] or 0),
             "cgs_mw": gen_df.iloc[0]["cgs_mw"] if not gen_df.empty else 0,
         }
         
@@ -533,7 +539,13 @@ async def get_sldc_status():
         return status
     except Exception as e:
         logger.error(f"Failed to fetch SLDC status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "timestamp": "Error", "scraped_at": datetime.now().isoformat(),
+            "frequency": 50.0, "state_ui_mw": 0, "state_demand_mw": 0,
+            "solar_mw": 0, "wind_mw": 0, "hydro_mw": 0, "thermal_mw": 0,
+            "thermal_ipp_mw": 0, "other_mw": 0, "pavagada_solar_mw": 0,
+            "live_generation_mw": 0, "ncep_mw": 0, "cgs_mw": 0, "is_stale": True
+        }
 
 
 @app.post("/sldc/sync", summary="Fetch the latest KPTCL SLDC readings now")
