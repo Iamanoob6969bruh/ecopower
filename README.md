@@ -57,7 +57,7 @@ The wind model utilizes hub-height correction and U/V vector decomposition to ha
 | :---: | :---: |
 | ![Wind Scatter](images/3.jpeg) | ![Wind Error](images/4.jpeg) |
 | *Consistent performance across speed ranges.* | *Low mean absolute error (MAE).* |
-
+ R^2 is around 91.9% for wind
 ---
 
 ## ⚠️ Known Limitations & Challenges
