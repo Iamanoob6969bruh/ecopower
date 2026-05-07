@@ -19,8 +19,8 @@ export const Forecast = () => {
       try {
         setLoading(true);
         const now = new Date();
-        const start = subHours(now, 12).toISOString();
-        const end = addHours(now, 12).toISOString();
+        const start = format(subHours(now, 12), "yyyy-MM-dd'T'HH:mm:ss");
+        const end = format(addHours(now, 12), "yyyy-MM-dd'T'HH:mm:ss");
 
         const response = await fetch(`${API_ENDPOINTS.GENERATION_AGGREGATE}?start=${start}&end=${end}`);
         if (!response.ok) throw new Error("Backend unreachable");

@@ -35,8 +35,9 @@ export const LiveGraph = ({
         setLoading(true);
         const now = new Date();
         // Rolling Window: 12 hours past to 12 hours future
-        const start = subHours(now, 12).toISOString();
-        const end = addHours(now, 12).toISOString();
+        // Use local format so backend (now in IST) understands it perfectly
+        const start = format(subHours(now, 12), "yyyy-MM-dd'T'HH:mm:ss");
+        const end = format(addHours(now, 12), "yyyy-MM-dd'T'HH:mm:ss");
 
         const response = await fetch(`${API_ENDPOINTS.PLANT_GENERATION(plant_id)}?start=${start}&end=${end}`);
         if (!response.ok) throw new Error("Failed to fetch");
