@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { API_ENDPOINTS } from "@/lib/api";
+import { API_ENDPOINTS } from "../lib/api";
 
 const W = 1000;
 const H = 320;
@@ -14,10 +14,8 @@ export const ForecastPanel = () => {
     const fetchData = async () => {
       try {
         const now = new Date();
-        // ROLLING WINDOW: 12h ago to 12h from now
-        const start = new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString();
-        const end = new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString();
-        const response = await fetch(`${API_ENDPOINTS.GENERATION_AGGREGATE}?start=${start}&end=${end}`);
+        const start = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+        const response = await fetch(`${API_ENDPOINTS.GENERATION_AGGREGATE}?start=${start}`);
         if (!response.ok) throw new Error("Failed to fetch");
         const raw = await response.json();
 

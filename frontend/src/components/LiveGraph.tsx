@@ -12,7 +12,7 @@ import {
 import { format, parseISO, startOfDay, addDays } from "date-fns";
 import { Activity } from "lucide-react";
 
-import { API_ENDPOINTS } from "@/lib/api";
+import { API_ENDPOINTS } from "../lib/api";
 
 export const LiveGraph = ({
   plant_id,
@@ -32,10 +32,9 @@ export const LiveGraph = ({
   useEffect(() => {
     const fetchData = () => {
       const now = new Date();
-      // ROLLING WINDOW: Show from 12 hours ago until 12 hours from now
-      // This ensures the graph is never blank at midnight.
-      const start = format(new Date(now.getTime() - 12 * 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm:ss");
-      const end = format(new Date(now.getTime() + 12 * 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm:ss");
+      // Rolling Window: 24 hours in the past, 24 hours in the future
+      const start = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+      const end = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
 
       fetch(`${API_ENDPOINTS.PLANT_GENERATION(plant_id)}?start=${start}&end=${end}`)
         .then((res) => {
@@ -199,6 +198,19 @@ export const LiveGraph = ({
               connectNulls={true}
             />
 
+            <ReferenceLine
+              x={new Date().getTime()}
+              stroke="hsl(var(--primary))"
+              strokeDasharray="3 3"
+              label={{
+                value: 'NOW',
+                position: 'top',
+                fill: 'hsl(var(--primary))',
+                fontFamily: 'JetBrains Mono',
+                fontSize: 9
+              }}
+            />
+            
             <Area
               type="monotone"
               dataKey="actual_kw"

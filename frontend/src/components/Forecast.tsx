@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { API_ENDPOINTS } from "@/lib/api";
+import { API_ENDPOINTS } from "../lib/api";
 
 interface ForecastData {
   hour: number;
