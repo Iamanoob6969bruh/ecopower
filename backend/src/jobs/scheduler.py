@@ -15,12 +15,16 @@ from src.jobs.backfill import interpolate_weather_to_15min, run_backfill
 
 logger = logging.getLogger(__name__)
 
+import pytz
+from datetime import datetime, timedelta
+
 def run_15min_job():
     logger.info("Running 15-minute live fetch job...")
     db = SessionLocal()
+    kolkata = pytz.timezone('Asia/Kolkata')
     try:
         plants = get_plants()
-        now = datetime.now()
+        now = datetime.now(kolkata).replace(tzinfo=None)
         # Look back 24 hours and forward 24 hours to ensure no gaps at midnight
         start_of_window = now - timedelta(hours=24)
         two_hours_ahead = now + timedelta(hours=24)

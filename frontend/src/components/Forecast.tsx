@@ -98,7 +98,8 @@ export const Forecast = () => {
 
     if (!data || data.length === 0) return null;
 
-    const yMax = Math.max(...data.flatMap(d => getValues(d))) * 1.1;
+    const maxVal = Math.max(...data.flatMap(d => getValues(d)));
+    const yMax = maxVal > 0 ? maxVal * 1.1 : 100;
     const xScale = (i: number) => PAD.l + (i / (data.length - 1)) * (W - PAD.l - PAD.r);
     const yScale = (v: number) => PAD.t + (1 - v / yMax) * (H - PAD.t - PAD.b);
 

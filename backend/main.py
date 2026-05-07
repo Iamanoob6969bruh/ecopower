@@ -28,10 +28,13 @@ async def lifespan(app: FastAPI):
 
     # Manually trigger the SLDC scraper thread since 'mount' doesn't run it
     from src.data.scraper import run_scrape
+    import pytz
+    from datetime import datetime
     def _run_sldc_job():
+        kolkata = pytz.timezone('Asia/Kolkata')
         while True:
             try:
-                logger.info("Background SLDC sync starting...")
+                logger.info(f"Background SLDC sync starting (Time: {datetime.now(kolkata)})...")
                 run_scrape()
                 logger.info("Background SLDC sync complete.")
             except Exception as e:
