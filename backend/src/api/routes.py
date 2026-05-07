@@ -13,17 +13,6 @@ router = APIRouter(prefix="/api")
 def api_get_plants():
     return get_plants()
 
-def parse_iso_to_local(iso_str: str):
-    if not iso_str: return None
-    try:
-        # Standardize Z to offset and parse
-        dt = datetime.fromisoformat(iso_str.replace('Z', '+00:00'))
-        # Convert to server's local time (respects the TZ env variable)
-        return dt.astimezone().replace(tzinfo=None)
-    except Exception as e:
-        print(f"Time Parse Error: {e}")
-        return None
-
 @router.get("/generation/{plant_id}")
 def api_get_generation(
     plant_id: str, 
@@ -31,21 +20,35 @@ def api_get_generation(
     end: Optional[str] = None, 
     db: Session = Depends(get_db)
 ):
+    print(f"FETCHING GENERATION: plant={plant_id} start={start} end={end}")
     plant = get_plant_by_id(plant_id)
     if not plant:
         raise HTTPException(status_code=404, detail="Plant not found")
         
     query = db.query(GenerationData).filter(GenerationData.plant_id == plant_id)
     
-    start_dt = parse_iso_to_local(start)
-    if start_dt:
-        query = query.filter(GenerationData.timestamp >= start_dt)
+    if start:
+        try:
+            # Handle 'Z' suffix and other ISO variations
+            start_clean = start.replace('Z', '+00:00')
+            start_dt = datetime.fromisoformat(start_clean).replace(tzinfo=None)
+            query = query.filter(GenerationData.timestamp >= start_dt)
+        except ValueError as e:
+            print(f"Error parsing start date: {e}")
+            pass
             
-    end_dt = parse_iso_to_local(end)
-    if end_dt:
-        query = query.filter(GenerationData.timestamp <= end_dt)
+    if end:
+        try:
+            end_clean = end.replace('Z', '+00:00')
+            end_dt = datetime.fromisoformat(end_clean).replace(tzinfo=None)
+            query = query.filter(GenerationData.timestamp <= end_dt)
+        except ValueError as e:
+            print(f"Error parsing end date: {e}")
+            pass
             
     records = query.order_by(GenerationData.timestamp.asc()).all()
+    print(f"RETURNED {len(records)} records for {plant_id}")
+    
     return [
         {
             "timestamp": r.timestamp.isoformat(),
@@ -160,13 +163,15 @@ def api_get_aggregated_generation(
     plants = get_plants()
     
     # Standard time parsing
-    start_dt = parse_iso_to_local(start) or (datetime.now() - timedelta(hours=24))
-    end_dt = parse_iso_to_local(end) or (datetime.now() + timedelta(hours=24))
+    start_dt = datetime.fromisoformat(start.replace('Z', '+00:00')).replace(tzinfo=None) if start else datetime.now().replace(hour=0, minute=0, second=0)
+    end_dt = datetime.fromisoformat(end.replace('Z', '+00:00')).replace(tzinfo=None) if end else start_dt + timedelta(days=2)
 
-    # Fetch all records in range
+    # Fetch all records in range, but only actuals up to now
+    now_dt = datetime.now()
     records = db.query(GenerationData).filter(
         GenerationData.timestamp >= start_dt,
-        GenerationData.timestamp <= end_dt
+        GenerationData.timestamp <= end_dt,
+        GenerationData.timestamp <= now_dt
     ).all()
 
     if not records:
