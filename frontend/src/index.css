@@ -1,0 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Warm cream / ivory editorial light theme with deep ink + electric accents */
+    --background: 38 30% 96%;
+    --foreground: 220 30% 8%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 30% 8%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 30% 8%;
+
+    --primary: 220 30% 8%;
+    --primary-foreground: 38 30% 96%;
+
+    --secondary: 38 20% 90%;
+    --secondary-foreground: 220 30% 8%;
+
+    --muted: 38 18% 92%;
+    --muted-foreground: 220 10% 40%;
+
+    --accent: 16 85% 55%;
+    --accent-foreground: 38 30% 96%;
+
+    --solar: 38 95% 50%;
+    --wind: 200 70% 40%;
+    --emerald: 158 60% 35%;
+    --signal: 16 85% 55%;
+
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 85%;
+    --input: 220 15% 85%;
+    --ring: 220 30% 8%;
+
+    --radius: 0.25rem;
+
+    --shadow-soft: 0 1px 2px hsl(220 30% 8% / 0.04), 0 8px 24px -8px hsl(220 30% 8% / 0.08);
+    --shadow-card: 0 2px 4px hsl(220 30% 8% / 0.06), 0 24px 48px -12px hsl(220 30% 8% / 0.12);
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: "ss01", "cv11";
+  }
+  .font-serif { font-family: 'Instrument Serif', Georgia, serif; letter-spacing: -0.01em; }
+  .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  html { scroll-behavior: smooth; }
+}
+
+@layer utilities {
+  .ticker-line {
+    background-image: linear-gradient(to right, hsl(var(--border)) 50%, transparent 50%);
+    background-size: 8px 1px;
+    background-repeat: repeat-x;
+  }
+  .text-balance { text-wrap: balance; }
+}
+
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.animate-ticker { animation: ticker 60s linear infinite; }
+.animate-fade-up { animation: fade-up 0.8s cubic-bezier(0.4,0,0.2,1) forwards; opacity: 0; }
+.animate-blink { animation: blink 1.6s ease-in-out infinite; }

@@ -1,0 +1,62 @@
+Karnataka Wind Power Plants
+Complete Dataset & Feature Reference for ML Generation Forecasting
+Total State Installed Capacity: ~7,351 MW  |  Rank: #1 in India (FY 2024-25)  |  Reference: KREDL / MNRE / CEA
+
+1. Karnataka Wind Power — State Overview
+Karnataka is India's #1 wind energy state as of FY 2024-25, with a cumulative installed wind capacity of 7,351 MW, having added a record 1,331.48 MW in FY25 alone. The wind resource is concentrated in the northern and central districts — Vijayapura, Gadag, Chitradurga, Koppal, Ballari, Davangere, and Belagavi — where the Deccan Plateau's elevation creates consistent wind flows, especially during the Southwest Monsoon (June–September).
+
+
+Note: Capacity figures marked '~' are approximate aggregates from multiple commissioned projects within the zone per KREDL district-wise data. The Vijayapura and Koppal zones are the largest contributors. Data sources: KREDL.karnataka.gov.in, CEA Resource Adequacy Plan 2024, MNRE.
+
+
+2. Complete Feature Set for Wind Generation Forecasting Model
+The table below covers every input variable required to train a robust wind power forecasting model — from raw meteorological drivers and plant-static parameters to operational SCADA data, temporal features, NWP forecast inputs, and derived/engineered features.
+
+
+
+3. Core Generation Calculation Formulas
+These physics-based equations are essential for data preprocessing, feature engineering, and building physics-informed ML models.
+
+
+
+4. Where to Get the Data — Free & Open Sources
+
+
+
+5. Recommended ML Modeling Pipeline
+Step 1 — Data Collection & Alignment
+Download ERA5/MERRA-2 historical wind data (1980-2024) for Karnataka bounding box (14°N–18°N, 74°E–78°E)
+Collect SCADA/SLDC actual generation data for each plant (15-min or 1-hr resolution)
+Obtain static parameters: power curves, hub heights, lat/lon, installed capacity per plant from KREDL / developer data
+Align all data to a common UTC timestamp index; resample to 1-hour resolution
+Step 2 — Preprocessing
+Remove curtailed periods (use SCADA curtailment flag or SLDC dispatch instructions)
+Filter turbine fault/maintenance periods using status codes
+Apply air density correction to wind speed using co-located temperature and pressure
+Extrapolate 10m NWP wind to hub height using power law (α) or log law (z₀)
+Cyclically encode hour and day-of-year using sin/cos transformation
+Step 3 — Feature Engineering
+Compute Wind Power Density (WPD = 0.5 × ρ × V³) as a super-feature
+Add rolling statistics: 1h, 6h, 24h mean/std of wind speed
+Compute NWP forecast error (bias) as a correction feature
+Create plant-level embeddings (or one-hot encode plant ID) for multi-plant models
+Fit Weibull k and c parameters per month/season per plant location
+Step 4 — Model Architecture Options
+Baseline: Gradient Boosting (XGBoost/LightGBM) — fast, interpretable, strong for tabular wind data
+Time-series: LSTM / Temporal Fusion Transformer (TFT) — captures diurnal and seasonal patterns
+Physics-informed: Combine power curve lookup with ML residual correction
+Ensemble: Blend NWP-physics model + ML model for best day-ahead accuracy
+Step 5 — Evaluation Metrics
+RMSE (Root Mean Square Error) — penalizes large errors; primary metric
+MAE (Mean Absolute Error) — robust to outliers
+MAPE (Mean Absolute Percentage Error) — caution: unreliable near zero generation
+Normalized RMSE (nRMSE = RMSE/Prated) — compare across plants of different size
+Skill Score vs. persistence forecast — measures improvement over naive baseline
+
+
+6. Karnataka Wind Seasonality — Key Patterns for Model
+
+Karnataka's Tuppadahalli wind farm (Chitradurga) was recognized as India's best-performing wind farm in FY 2021-22, with a capacity factor significantly exceeding the state average. The Gadag and Vijayapura districts consistently show the highest annual mean wind speeds (7-8 m/s at 100m), making them the model's highest-confidence prediction zones.
+
+
+Document prepared for Karnataka Wind Generation Forecasting ML Project  |  Data as of May 2026  |  Sources: KREDL, CEA, MNRE, ERA5, NIWE
