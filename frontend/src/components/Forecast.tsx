@@ -19,9 +19,10 @@ export const Forecast = () => {
         const response = await fetch(`${API_ENDPOINTS.SLDC_GENERATION}?limit=24`);
         if (!response.ok) throw new Error("Backend unreachable");
         const raw = await response.json();
+        if (!Array.isArray(raw)) throw new Error("Invalid data format");
 
         // Reverse for chronological order
-        const sorted = raw.reverse();
+        const sorted = [...raw].reverse();
 
         const chartData = sorted.map((entry: any, i: number) => {
           // Physics-based forecast simulation based on SLDC trend
@@ -233,11 +234,19 @@ export const Forecast = () => {
 
 
       <div className="flex flex-col gap-8">
-        <ForecastChart title="Solar + Wind Forecast (Combined)" type="combined" data={data} />
-        <div className="grid lg:grid-cols-2 gap-8">
-          <ForecastChart title="Solar Generation Forecast" type="solar" data={data} />
-          <ForecastChart title="Wind Generation Forecast" type="wind" data={data} />
-        </div>
+        {data.length > 0 ? (
+          <>
+            <ForecastChart title="Solar + Wind Forecast (Combined)" type="combined" data={data} />
+            <div className="grid lg:grid-cols-2 gap-8">
+              <ForecastChart title="Solar Generation Forecast" type="solar" data={data} />
+              <ForecastChart title="Wind Generation Forecast" type="wind" data={data} />
+            </div>
+          </>
+        ) : (
+          <div className="border border-dashed border-border p-20 text-center text-muted-foreground font-mono text-xs uppercase tracking-widest bg-card">
+            Syncing Karnataka SLDC Generation Baseline...
+          </div>
+        )}
       </div>
     </section>
   );

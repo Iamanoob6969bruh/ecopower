@@ -437,7 +437,7 @@ async def get_sldc_generation(limit: int = 48):
     _sync_sldc_if_stale()
     db_path = Path("data/karnataka_solar.db")
     if not db_path.exists():
-        return {"status": "error", "message": "SLDC database not found"}
+        return []
 
     try:
         con = sqlite3.connect(db_path)
