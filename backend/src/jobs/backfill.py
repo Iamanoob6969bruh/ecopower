@@ -40,8 +40,9 @@ def run_backfill(db: Session = None):
 
     try:
         plants = get_plants()
-        start_date_str = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-        yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        now_ist = get_now_ist()
+        start_date_str = (now_ist - timedelta(days=7)).strftime("%Y-%m-%d")
+        yesterday_str = (now_ist - timedelta(days=1)).strftime("%Y-%m-%d")
         
         for plant in plants:
             plant_id = plant['id']
