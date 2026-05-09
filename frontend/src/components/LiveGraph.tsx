@@ -88,6 +88,18 @@ export const LiveGraph = ({
 
   const nowMs = new Date().getTime();
 
+  // Ensure chart data always extends to "now" so the main pointer is visible
+  // even if backend hasn't generated data for the current timeslot yet
+  const chartData = React.useMemo(() => {
+    if (data.length === 0) return data;
+    const lastPoint = data[data.length - 1];
+    if (lastPoint && lastPoint.timestampMs < nowMs) {
+      // Add a transparent anchor at "now" so the chart extends to current time
+      return [...data, { timestampMs: nowMs, actual_kw: null, predicted_kw: null }];
+    }
+    return data;
+  }, [data, nowMs]);
+
   if (loading) {
     return (
       <div className="w-full h-[350px] flex items-center justify-center font-mono text-xs text-muted-foreground animate-pulse">
@@ -127,7 +139,7 @@ export const LiveGraph = ({
 
       <div className="w-full flex-1 p-6 border border-dashed border-muted-foreground/30 bg-background/20 rounded-sm">
         <ResponsiveContainer width="100%" height={380}>
-          <AreaChart data={data} margin={{ top: 40, right: 20, left: 0, bottom: 40 }}>
+          <AreaChart data={chartData} margin={{ top: 40, right: 20, left: 0, bottom: 40 }}>
             <defs>
               <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={primaryColor} stopOpacity={0.4} />

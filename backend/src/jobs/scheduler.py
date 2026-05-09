@@ -152,8 +152,8 @@ def start_scheduler():
     # Run backfill exactly once asynchronously
     scheduler.add_job(run_backfill, 'date', run_date=datetime.now() + timedelta(seconds=5))
     
-    # 15 minute intervals
-    scheduler.add_job(run_15min_job, IntervalTrigger(minutes=15), next_run_time=datetime.now() + timedelta(seconds=15))
+    # 15 minute intervals — delay first run to let backfill finish without API collisions
+    scheduler.add_job(run_15min_job, IntervalTrigger(minutes=15), next_run_time=datetime.now() + timedelta(seconds=120))
     
     # Midnight cleanup
     scheduler.add_job(run_midnight_cleanup, CronTrigger(hour=0, minute=5))
