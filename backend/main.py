@@ -25,8 +25,8 @@ async def lifespan(app: FastAPI):
     logger.info("Starting background scheduler...")
     global scheduler
     from src.jobs.scheduler import run_15min_job, start_scheduler
-    # Trigger first run immediately so user doesn't wait 15 mins
-    run_15min_job()
+    # Run first sync in background thread to avoid blocking FastAPI startup/health checks
+    threading.Thread(target=run_15min_job, daemon=True).start()
     scheduler = start_scheduler()
 
     # Manually trigger the SLDC scraper thread since 'mount' doesn't run it

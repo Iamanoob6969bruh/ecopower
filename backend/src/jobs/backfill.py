@@ -127,12 +127,3 @@ def run_backfill(db: Session = None):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     run_backfill()
-        logger.error(f"Backfill failed: {e}")
-        db.rollback()
-    finally:
-        if close_db:
-            db.close()
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    run_backfill()
