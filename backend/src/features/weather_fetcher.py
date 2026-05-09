@@ -1,6 +1,7 @@
 import requests
 from datetime import datetime, timedelta
 import logging
+import time
 from src.data.database import SessionLocal, WeatherDataCache
 
 logger = logging.getLogger(__name__)
@@ -8,6 +9,28 @@ logger = logging.getLogger(__name__)
 # Simple in-memory cache: {(plant_id, "forecast"|"historical", start_date, end_date): (timestamp, data)}
 _cache = {}
 CACHE_TTL = timedelta(minutes=10)
+
+# Retry config for 429 rate-limit errors
+MAX_RETRIES = 3
+RETRY_BASE_DELAY = 5  # seconds, will double each retry
+
+def _request_with_retry(url: str, params: dict, context: str = "") -> requests.Response:
+    """Make an HTTP GET with automatic retry on 429 (Too Many Requests)."""
+    for attempt in range(MAX_RETRIES + 1):
+        response = requests.get(url, params=params, timeout=15)
+        if response.status_code == 429:
+            if attempt < MAX_RETRIES:
+                delay = RETRY_BASE_DELAY * (2 ** attempt)
+                logger.warning(f"[{context}] 429 rate-limited. Retrying in {delay}s (attempt {attempt+1}/{MAX_RETRIES})...")
+                time.sleep(delay)
+                continue
+            else:
+                logger.error(f"[{context}] 429 rate-limited. All {MAX_RETRIES} retries exhausted.")
+        response.raise_for_status()
+        return response
+    # Should not reach here, but just in case
+    response.raise_for_status()
+    return response
 
 def _get_from_cache(cache_key):
     if cache_key in _cache:
@@ -69,8 +92,7 @@ def fetch_historical_weather(plant_id: str, lat: float, lon: float, start_date: 
     }
 
     try:
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
+        response = _request_with_retry(url, params, context=f"{plant_id}/historical")
         data = response.json()
         
         parsed_data = {}
@@ -105,8 +127,7 @@ def fetch_forecast_weather(plant_id: str, lat: float, lon: float, forecast_days:
     }
 
     try:
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
+        response = _request_with_retry(url, params, context=f"{plant_id}/forecast")
         data = response.json()
         
         parsed_data = {}
