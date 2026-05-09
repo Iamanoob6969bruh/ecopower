@@ -11,8 +11,8 @@ _cache = {}
 CACHE_TTL = timedelta(minutes=10)
 
 # Retry config for 429 rate-limit errors
-MAX_RETRIES = 3
-RETRY_BASE_DELAY = 5  # seconds, will double each retry
+MAX_RETRIES = 4
+RETRY_BASE_DELAY = 30  # seconds — Open-Meteo rate limit window is ~60s
 
 def _request_with_retry(url: str, params: dict, context: str = "") -> requests.Response:
     """Make an HTTP GET with automatic retry on 429 (Too Many Requests)."""

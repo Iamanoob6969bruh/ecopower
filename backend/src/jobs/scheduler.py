@@ -108,7 +108,7 @@ def run_15min_job():
                 
                 # Rate limiting to avoid 429 errors from Open-Meteo on Render
                 import time
-                time.sleep(2.5)
+                time.sleep(5)
                 
             except Exception as plant_err:
                 logger.error(f"[{plant_id}] Failed during 15min job: {plant_err}")
@@ -152,8 +152,8 @@ def start_scheduler():
     # Run backfill exactly once asynchronously
     scheduler.add_job(run_backfill, 'date', run_date=datetime.now() + timedelta(seconds=5))
     
-    # 15 minute intervals — delay first run to let backfill finish without API collisions
-    scheduler.add_job(run_15min_job, IntervalTrigger(minutes=15), next_run_time=datetime.now() + timedelta(seconds=120))
+    # 15 minute intervals — delay first run to 5 min so backfill finishes and rate limit resets
+    scheduler.add_job(run_15min_job, IntervalTrigger(minutes=15), next_run_time=datetime.now() + timedelta(seconds=300))
     
     # Midnight cleanup
     scheduler.add_job(run_midnight_cleanup, CronTrigger(hour=0, minute=5))
