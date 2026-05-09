@@ -3,7 +3,8 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime
 import os
 
-DB_PATH = os.environ.get("DB_PATH", "sqlite:///./dashboard.db")
+# Unify the database path for both API and Scrapers
+DB_PATH = os.environ.get("DB_PATH", "sqlite:///./data/karnataka_solar.db")
 
 engine = create_engine(DB_PATH, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
