@@ -62,7 +62,7 @@ def get_db():
         db.close()
 
 def get_now_ist():
-    """Returns the current datetime in Asia/Kolkata (naive)."""
+    """Returns the current time in Asia/Kolkata as a naive datetime object."""
     import pytz
     kolkata = pytz.timezone('Asia/Kolkata')
     return datetime.now(kolkata).replace(tzinfo=None)

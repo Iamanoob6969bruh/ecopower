@@ -3,7 +3,6 @@ import pandas as pd
 from datetime import datetime
 import pvlib
 from pvlib.location import Location
-from src.data.database import get_now_ist
 
 def generate_solar_actual(weather_dict: dict, plant: dict, global_seed: int = 42) -> list:
     """
@@ -66,7 +65,7 @@ def generate_solar_actual(weather_dict: dict, plant: dict, global_seed: int = 42
     df['T_cell'] = temp + df['POA'] * (NOCT - 20.0) / 800.0
     
     # Aging Factor
-    years_elapsed = get_now_ist().year - commissioning_year
+    years_elapsed = datetime.now().year - commissioning_year
     aging_factor = np.clip(1 - aging_rate * years_elapsed, 0.80, 1.0)
 
     # DC Power logic

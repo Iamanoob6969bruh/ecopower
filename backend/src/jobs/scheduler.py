@@ -6,11 +6,12 @@ from apscheduler.triggers.cron import CronTrigger
 import pandas as pd
 from sqlalchemy import delete
 
-from src.data.database import SessionLocal, GenerationData, get_now_ist
+from src.data.database import SessionLocal, GenerationData
 from src.config.plants import get_plants
 from src.features.weather_fetcher import fetch_forecast_weather
 from src.models.synthetic_actual import generate_solar_actual, generate_wind_actual
 from src.models.predictor import predict_solar, predict_wind
+from src.data.database import SessionLocal, GenerationData, get_now_ist
 from src.jobs.backfill import interpolate_weather_to_15min, run_backfill
 
 logger = logging.getLogger(__name__)
@@ -104,9 +105,19 @@ def run_15min_job():
                 db.bulk_save_objects(db_records)
                 db.commit()
                 logger.info(f"[{plant_id}] Updated {len(db_records)} records.")
+                
+                # Rate limiting to avoid 429 errors from Open-Meteo on Render
+                import time
+                time.sleep(1.5)
+                
             except Exception as plant_err:
-                logger.error(f"[{plant_id}] Failed during processing: {plant_err}")
+                logger.error(f"[{plant_id}] Failed during 15min job: {plant_err}")
                 db.rollback()
+            
+        logger.info("15-minute job completed.")
+    except Exception as e:
+        logger.error(f"15-minute job failed: {e}")
+        db.rollback()
     finally:
         db.close()
 
@@ -115,7 +126,7 @@ def run_midnight_cleanup():
     db = SessionLocal()
     try:
         # Convert all zone2/zone3 records from previous days into zone1
-        now = get_now_ist()
+        now = datetime.now()
         start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
         
         records_to_update = db.query(GenerationData).filter(

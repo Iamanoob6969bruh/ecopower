@@ -169,7 +169,12 @@ def fetch_page(url: str, timeout: int = 20) -> BeautifulSoup | None:
     try:
         resp = _session.get(url, timeout=timeout)
         resp.raise_for_status()
-        return BeautifulSoup(resp.text, "lxml")
+        # Prefer lxml for speed, fallback to html.parser if not installed
+        try:
+            return BeautifulSoup(resp.text, "lxml")
+        except Exception:
+            log.warning("lxml not found, falling back to html.parser")
+            return BeautifulSoup(resp.text, "html.parser")
     except requests.RequestException as e:
         log.error("Failed to fetch %s: %s", url, e)
         return None

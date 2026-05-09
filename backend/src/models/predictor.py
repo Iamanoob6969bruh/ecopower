@@ -145,7 +145,7 @@ def predict_generation(weather_dict: dict, plant: dict) -> list:
         kw_val = float(live_predicted_mw[i]) * 1000.0
         
         # Get raw metrics for this timestamp
-        # Standardize ISO format for lookup
+        # Standardize ISO format for lookup (no seconds, no offset)
         ts_iso = ts.strftime("%Y-%m-%dT%H:%M:%S")
         metrics = weather_dict.get(ts_iso, {})
         

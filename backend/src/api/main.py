@@ -163,9 +163,9 @@ def _sync_sldc_if_stale(max_age_seconds: int = 55) -> None:
     try:
         if _last_sldc_sync and (now - _last_sldc_sync).total_seconds() < max_age_seconds:
             return
-        from src.data.database import get_now_ist
+        from src.data.scraper import run_scrape
         run_scrape()
-        _last_sldc_sync = get_now_ist()
+        _last_sldc_sync = datetime.now()
     except Exception as exc:
         logger.warning("SLDC sync failed: %s", exc)
     finally:
@@ -467,8 +467,7 @@ async def get_sldc_generation(limit: int = 48):
         if df.empty:
             # Fallback: Generate synthetic baseline for the last 24 hours so charts aren't blank
             logger.info("No SLDC history found, generating synthetic baseline for charts...")
-            from src.data.database import get_now_ist
-            now = get_now_ist()
+            now = datetime.now()
             synthetic = []
             for i in range(limit):
                 ts = now - timedelta(hours=i)

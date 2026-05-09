@@ -83,7 +83,7 @@ def api_get_live(db: Session = Depends(get_db)):
 @router.get("/summary/{plant_id}")
 def api_get_summary(plant_id: str, db: Session = Depends(get_db)):
     """Today's total generation, average prediction accuracy, peak timestamp/value."""
-    now = get_now_ist()
+    now = datetime.now()
     start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     
     records = db.query(GenerationData).filter(
@@ -130,7 +130,7 @@ def api_get_total_summary(plant_type: str, db: Session = Depends(get_db)):
     from src.config.plants import get_plants
     plants = [p for p in get_plants() if p['type'] == plant_type]
     
-    now = get_now_ist()
+    now = datetime.now()
     start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     
     total_kwh = 0
