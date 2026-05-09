@@ -3,7 +3,30 @@
  * Automatically switches between production (Render) and local development.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+// Dynamic detection for Render vs Localhost
+const getInitialBaseUrl = () => {
+    // 1. Check for manual environment variable
+    if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL;
+    
+    // 2. If we are on Render, use your specific backend URL as a safety fallback
+    if (typeof window !== "undefined") {
+        if (window.location.hostname.includes("onrender.com")) {
+            return "https://ecopower-backend.onrender.com";
+        }
+        if (window.location.hostname.includes("localhost")) {
+            return "http://localhost:8000";
+        }
+    }
+    
+    return "http://localhost:8000";
+};
+
+const API_BASE_URL = getInitialBaseUrl();
+
+// Debugging helper
+if (typeof window !== "undefined") {
+    console.log("🚀 ECO POWER API initialized at:", API_BASE_URL);
+}
 
 // Remove trailing slash if present
 export const getBaseUrl = () => API_BASE_URL.replace(/\/$/, "");
