@@ -111,7 +111,7 @@ def run_backfill(db: Session = None):
                 
                 # Rate limiting for Open-Meteo on Render
                 import time
-                time.sleep(1.5)
+                time.sleep(2.5)
                 
             except Exception as plant_err:
                 logger.error(f"[{plant_id}] Backfill step failed: {plant_err}")

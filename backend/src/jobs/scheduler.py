@@ -108,7 +108,7 @@ def run_15min_job():
                 
                 # Rate limiting to avoid 429 errors from Open-Meteo on Render
                 import time
-                time.sleep(1.5)
+                time.sleep(2.5)
                 
             except Exception as plant_err:
                 logger.error(f"[{plant_id}] Failed during 15min job: {plant_err}")
