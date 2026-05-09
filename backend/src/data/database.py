@@ -61,6 +61,12 @@ def get_db():
     finally:
         db.close()
 
+def get_now_ist():
+    """Returns the current datetime in Asia/Kolkata (naive)."""
+    import pytz
+    kolkata = pytz.timezone('Asia/Kolkata')
+    return datetime.now(kolkata).replace(tzinfo=None)
+
 if __name__ == "__main__":
     init_db()
     print("Database initialized successfully.")

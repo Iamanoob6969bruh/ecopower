@@ -11,13 +11,15 @@ CACHE_TTL = timedelta(minutes=10)
 
 def _get_from_cache(cache_key):
     if cache_key in _cache:
+        from src.data.database import get_now_ist
         cached_time, data = _cache[cache_key]
-        if datetime.now() - cached_time < CACHE_TTL:
+        if get_now_ist() - cached_time < CACHE_TTL:
             return data
     return None
 
 def _save_to_cache(cache_key, data):
-    _cache[cache_key] = (datetime.now(), data)
+    from src.data.database import get_now_ist
+    _cache[cache_key] = (get_now_ist(), data)
 
 def _get_fallback_weather(plant_id: str, target_time: datetime = None):
     """Fallback to the latest known weather for this plant in DB."""
@@ -124,6 +126,7 @@ def fetch_forecast_weather(plant_id: str, lat: float, lon: float, forecast_days:
         fallback = _get_fallback_weather(plant_id)
         if fallback:
             # Fake the current timestamp using the fallback data
-            now_str = datetime.now().strftime("%Y-%m-%dT%H:00")
+            from src.data.database import get_now_ist
+            now_str = get_now_ist().strftime("%Y-%m-%dT%H:00")
             return {now_str: fallback}
         return {}

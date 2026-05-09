@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta
 import pandas as pd
 from sqlalchemy.orm import Session
-from src.data.database import SessionLocal, GenerationData
+from src.data.database import SessionLocal, GenerationData, get_now_ist
 from src.features.weather_fetcher import fetch_historical_weather
 from src.config.plants import get_plants
 from src.models.synthetic_actual import generate_solar_actual, generate_wind_actual
@@ -28,7 +28,7 @@ def interpolate_weather_to_15min(hourly_weather_dict: dict) -> dict:
     # Format back to dict
     res_dict = {}
     for ts, row in df_15min.iterrows():
-        res_dict[ts.isoformat()] = row.to_dict()
+        res_dict[ts.replace(tzinfo=None).strftime("%Y-%m-%dT%H:%M:%S")] = row.to_dict()
     return res_dict
 
 def run_backfill(db: Session = None):
@@ -39,8 +39,9 @@ def run_backfill(db: Session = None):
 
     try:
         plants = get_plants()
-        start_date_str = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-        yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        now = get_now_ist()
+        start_date_str = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+        yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
         
         for plant in plants:
             plant_id = plant['id']

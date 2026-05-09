@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional, List
 import pandas as pd
 
-from src.data.database import get_db, GenerationData
+from src.data.database import get_db, GenerationData, get_now_ist
 from src.config.plants import get_plants, get_plant_by_id
 
 router = APIRouter(prefix="/api")
@@ -83,7 +83,7 @@ def api_get_live(db: Session = Depends(get_db)):
 @router.get("/summary/{plant_id}")
 def api_get_summary(plant_id: str, db: Session = Depends(get_db)):
     """Today's total generation, average prediction accuracy, peak timestamp/value."""
-    now = datetime.now()
+    now = get_now_ist()
     start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     
     records = db.query(GenerationData).filter(
@@ -130,7 +130,7 @@ def api_get_total_summary(plant_type: str, db: Session = Depends(get_db)):
     from src.config.plants import get_plants
     plants = [p for p in get_plants() if p['type'] == plant_type]
     
-    now = datetime.now()
+    now = get_now_ist()
     start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     
     total_kwh = 0
@@ -163,11 +163,11 @@ def api_get_aggregated_generation(
     plants = get_plants()
     
     # Standard time parsing
-    start_dt = datetime.fromisoformat(start.replace('Z', '+00:00')).replace(tzinfo=None) if start else datetime.now().replace(hour=0, minute=0, second=0)
+    start_dt = datetime.fromisoformat(start.replace('Z', '+00:00')).replace(tzinfo=None) if start else get_now_ist().replace(hour=0, minute=0, second=0, microsecond=0)
     end_dt = datetime.fromisoformat(end.replace('Z', '+00:00')).replace(tzinfo=None) if end else start_dt + timedelta(days=2)
 
     # Fetch all records in range, but only actuals up to now
-    now_dt = datetime.now()
+    now_dt = get_now_ist()
     records = db.query(GenerationData).filter(
         GenerationData.timestamp >= start_dt,
         GenerationData.timestamp <= end_dt,

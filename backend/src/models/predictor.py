@@ -145,7 +145,8 @@ def predict_generation(weather_dict: dict, plant: dict) -> list:
         kw_val = float(live_predicted_mw[i]) * 1000.0
         
         # Get raw metrics for this timestamp
-        ts_iso = ts.isoformat()
+        # Standardize ISO format for lookup
+        ts_iso = ts.strftime("%Y-%m-%dT%H:%M:%S")
         metrics = weather_dict.get(ts_iso, {})
         
         results.append({
@@ -206,7 +207,7 @@ def physics_fallback_prediction(weather_dict: dict, plant: dict) -> list:
     # Convert "actual" format to "predicted" format (they use the same physics)
     preds = []
     for a in actuals:
-        ts_iso = a['timestamp'].isoformat()
+        ts_iso = a['timestamp'].strftime("%Y-%m-%dT%H:%M:%S")
         metrics = weather_dict.get(ts_iso, {})
         
         preds.append({
@@ -299,7 +300,7 @@ def predict_solar_special(weather_dict: dict, plant: dict) -> list:
     
     results = []
     for i, ts in enumerate(df.index):
-        ts_iso = ts.isoformat()
+        ts_iso = ts.strftime("%Y-%m-%dT%H:%M:%S")
         # Find raw metrics (Open-Meteo format)
         metrics = weather_dict.get(ts_iso, {})
         
