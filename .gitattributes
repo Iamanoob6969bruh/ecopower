@@ -1,0 +1,8 @@
+# LightGBM model dumps are plain text but newline-sensitive: the parser reads
+# them line by line, so CRLF conversion corrupts them. Force LF, no conversion.
+# (This was the cause of the "Model format error, expect a tree here" failures
+#  on Windows checkouts where core.autocrlf=true.)
+solar_lightgbm.txt        text eol=lf
+solar_lightgbm_fixed.txt  text eol=lf
+synthetic_base_model.txt  text eol=lf
+temp_model.txt            text eol=lf

@@ -295,8 +295,7 @@ def predict_solar_special(weather_dict: dict, plant: dict) -> list:
     ac_cap_mw = plant.get('ac_capacity_mw', plant.get('capacity_kw', 1000) / 1000.0)
     
     scaled_dc_output = (raw_preds / BASE_MODEL_DC) * dc_cap_mw
-    # Increase amplitude by 5-8% to make it separable and prominent
-    live_predicted_mw = np.clip(scaled_dc_output * 1.08, 0, ac_cap_mw)
+    live_predicted_mw = np.clip(scaled_dc_output, 0, ac_cap_mw)
     
     results = []
     for i, ts in enumerate(df.index):
@@ -318,22 +317,8 @@ def predict_solar(weather_dict: dict, plant: dict) -> list:
     return predict_generation(weather_dict, plant)
 
 def predict_wind(weather_dict: dict, plant: dict) -> list:
-    results = predict_generation(weather_dict, plant)
-    # Add significant "AI deviation" with a bias to ensure separability from the actual curve
-    import math
-    import random
-    
-    # Random phase for each plant
-    phase = random.uniform(0, 2 * math.pi)
-    freq = 0.2
-    
-    for i, res in enumerate(results):
-        # 10% base bias + 12% sine deviation + 5% random jitter
-        deviation = 1.10 + (0.12 * math.sin(i * freq + phase)) + random.uniform(-0.05, 0.05)
-        res['predicted_kw'] = round(max(0, res['predicted_kw'] * deviation), 2)
-        
-        # Reason is already set by predict_generation, but we can enhance it
-        if deviation > 1.2:
-            res['reason'] = res['reason'] + " AI detects potential under-performance."
-            
-    return results
+    # Wind forecast comes straight from the trained LightGBM model.
+    # (Previously an artificial sine + random deviation was layered on top here
+    #  to force visual separation from the "actual" curve — that fakery has been
+    #  removed so the dashboard shows the model's genuine output.)
+    return predict_generation(weather_dict, plant)
