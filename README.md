@@ -40,24 +40,33 @@ This project is engineered for maintainability and scalability, following indust
 
 ## 🤖 Model Training & Validation
 
-Our forecasting engine is powered by specialized LightGBM regressors trained on multi-year historical data.
+Our forecasting engine uses separate LightGBM models for solar and wind, trained on
+Plant-Load-Factor (PLF) targets with physics-informed features.
 
-### ☀️ Solar Model Performance
-The solar model achieves an **R² of 0.955**, demonstrating exceptional tracking of the diurnal cycle and clear-sky indices.
+> ⚠️ **Note on data**: models are currently trained on physics-simulated /
+> "realistic" generation data, not measured SCADA. Reported metrics reflect
+> performance against that data. See *Known Limitations* below.
+
+### ☀️ Solar Model
+A physics-guided LightGBM regressor (**910 trees, 41 features** — SZA, tilted POA
+irradiance, clear-sky/clearness indices, cloud layers, GHI lags & rolling stats).
+It produces a single point forecast (no quantile band) and is scaled per-plant from
+a reference-capacity baseline.
 
 | Actual vs. Predicted (MW) | Time Series Zoom (5 Days) |
 | :---: | :---: |
 | ![Solar Scatter](images/1.png) | ![Solar Series](images/2.png) |
-| *High correlation with low residual variance.* | *Accurate tracking of ramp-up and ramp-down.* |
 
-### 💨 Wind Model Performance
-The wind model utilizes hub-height correction and U/V vector decomposition to handle complex wind patterns.
+### 💨 Wind Model
+LightGBM **quantile** regression (P10 / P50 / P90) with hub-height power-law
+correction and U/V wind-vector decomposition. Cross-validated pinball/RMSE on PLF:
+**P50 CV-RMSE ≈ 0.034**, P10 ≈ 0.041, P90 ≈ 0.044 (see `models/saved/wind_metrics.json`).
+The live dashboard displays the P50 median.
 
 | Actual vs. Predicted (MW) | Error Distribution (MW) |
 | :---: | :---: |
 | ![Wind Scatter](images/3.jpeg) | ![Wind Error](images/4.jpeg) |
-| *Consistent performance across speed ranges.* | *Low mean absolute error (MAE).* |
- R^2 is around 91.9% for wind
+
 ---
 
 ## ⚠️ Known Limitations & Challenges

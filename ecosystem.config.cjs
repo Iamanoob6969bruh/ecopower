@@ -1,11 +1,15 @@
 module.exports = {
   apps: [
     {
+      // Unified entrypoint: mounts the /api routes, the /sldc app, the scheduler
+      // and the background scraper. (Previously pointed at src/api/main.py, which
+      // is only the SLDC sub-app on port 8080 — no /api routes, no scheduler.)
       name: "eco-power-backend",
-      script: "backend/src/api/main.py",
+      script: "main.py",
       interpreter: "python",
+      cwd: "backend",
       env: {
-        PYTHONPATH: "backend"
+        PORT: "8000"
       }
     },
     {
