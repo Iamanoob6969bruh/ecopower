@@ -1,0 +1,16 @@
+{
+  "name": "ecopower",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ECO POWER — physics-guided solar & wind generation forecasting (backend + frontend).",
+  "scripts": {
+    "dev": "concurrently -n API,WEB -c blue,green -k \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "cd backend && python main.py",
+    "dev:web": "cd frontend && npm run dev",
+    "setup": "cd backend && pip install -r requirements.txt && cd ../frontend && npm install",
+    "build": "cd frontend && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
