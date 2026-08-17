@@ -168,9 +168,12 @@ dist/
 data/*.csv
 data/*.db
 data/*.geojson
-models/saved/*.pkl
 backend/logs/
 !data/karnataka.geojson
+
+# Trained model artifacts are tracked so clones are reproducible.
+# (Previously models/saved/*.pkl was ignored, which caused wind models to
+#  vanish on fresh clones — see Phase 1 cleanup.)
 
 # General Database files
 *.db
