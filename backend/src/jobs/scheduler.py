@@ -148,15 +148,26 @@ def run_midnight_cleanup():
 
 def start_scheduler():
     scheduler = BackgroundScheduler()
-    
-    # Run backfill exactly once asynchronously
-    scheduler.add_job(run_backfill, 'date', run_date=datetime.now() + timedelta(seconds=5))
-    
-    # 15 minute intervals — delay first run to 5 min so backfill finishes and rate limit resets
-    scheduler.add_job(run_15min_job, IntervalTrigger(minutes=15), next_run_time=datetime.now() + timedelta(seconds=300))
-    
+    now = datetime.now()
+
+    # Populate TODAY immediately (live predicted + simulated actual for -24h..+24h)
+    # so the dashboard isn't blank or stale right after startup. Previously this was
+    # delayed 5 minutes, which left today showing 0 until the first run fired.
+    # coalesce + max_instances guard against overlapping runs if one takes a while.
+    scheduler.add_job(
+        run_15min_job,
+        IntervalTrigger(minutes=15),
+        next_run_time=now + timedelta(seconds=15),
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Historical backfill (last 7 days -> zone1) fills in behind the live data.
+    # Runs after the first live job so the two don't hammer Open-Meteo at once.
+    scheduler.add_job(run_backfill, 'date', run_date=now + timedelta(seconds=120))
+
     # Midnight cleanup
     scheduler.add_job(run_midnight_cleanup, CronTrigger(hour=0, minute=5))
-    
+
     scheduler.start()
     return scheduler
