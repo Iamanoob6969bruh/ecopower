@@ -125,8 +125,10 @@ def run_midnight_cleanup():
     logger.info("Running Midnight Cleanup...")
     db = SessionLocal()
     try:
-        # Convert all zone2/zone3 records from previous days into zone1
-        now = datetime.now()
+        # Convert all zone2/zone3 records from previous days into zone1.
+        # Use IST (stored timestamps are naive-IST); on a UTC host datetime.now()
+        # would pick the wrong day boundary.
+        now = get_now_ist()
         start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
         
         records_to_update = db.query(GenerationData).filter(

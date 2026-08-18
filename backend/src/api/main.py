@@ -26,9 +26,9 @@ from pathlib import Path
 from datetime import date
 import threading
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from src.data.loader import load_scada, load_nwp, merge_datasets
+from src.data.loader import load_scada, load_nwp, merge_datasets, RAW_DIR
 from src.data.cleaner import clean
 from src.features.engineering import build_features, SOLAR_FEATURES, WIND_FEATURES
 
@@ -243,7 +243,7 @@ async def ingest_scada(records: List[Dict], background_tasks: BackgroundTasks):
     try:
         df = pd.DataFrame(records)
         df["timestamp"] = pd.to_datetime(df["timestamp"])
-        df.to_csv("data/raw/scada_generation.csv", mode="a", header=False, index=False)
+        df.to_csv(RAW_DIR / "scada_generation.csv", mode="a", header=False, index=False)
         logger.info(f"Appended {len(df)} real-time SCADA records.")
         background_tasks.add_task(_run_background_training)
         return {"status": "ok", "message": f"Appended {len(df)} SCADA records. Active training triggered."}
@@ -255,7 +255,7 @@ async def ingest_nwp(records: List[Dict], background_tasks: BackgroundTasks):
     try:
         df = pd.DataFrame(records)
         df["timestamp"] = pd.to_datetime(df["timestamp"])
-        df.to_csv("data/raw/nwp_weather.csv", mode="a", header=False, index=False)
+        df.to_csv(RAW_DIR / "nwp_weather.csv", mode="a", header=False, index=False)
         logger.info(f"Appended {len(df)} real-time NWP records.")
         background_tasks.add_task(_run_background_training)
         return {"status": "ok", "message": f"Appended {len(df)} NWP records. Active training triggered."}
@@ -389,8 +389,8 @@ async def explain_block(
 async def reload_data():
     """Manually trigger a reload of CSV files from the data/raw directory."""
     global _uploaded_scada, _uploaded_nwp
-    scada_path = Path("data/raw/scada_generation.csv")
-    nwp_path = Path("data/raw/nwp_weather.csv")
+    scada_path = RAW_DIR / "scada_generation.csv"
+    nwp_path = RAW_DIR / "nwp_weather.csv"
     
     if scada_path.exists():
         df = pd.read_csv(scada_path)

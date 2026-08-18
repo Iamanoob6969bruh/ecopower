@@ -57,7 +57,9 @@ app = FastAPI(title="ECO POWER Unified API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    # allow_credentials must be False with a wildcard origin — the combination is
+    # rejected by browsers. No cookie/session auth is used, so this is correct.
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -71,4 +73,7 @@ app.mount("/", sldc_app)
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    # Auto-reload only when DEV_RELOAD=1. Under a process manager (pm2) reload
+    # spawns an untracked child; keep it opt-in for local development.
+    reload = os.environ.get("DEV_RELOAD", "0") == "1"
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=reload)

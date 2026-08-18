@@ -2,11 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Optional, List
+import logging
 import pandas as pd
 
 from src.data.database import get_db, GenerationData, get_now_ist
 from src.config.plants import get_plants, get_plant_by_id
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
 @router.get("/plants")
@@ -20,7 +22,7 @@ def api_get_generation(
     end: Optional[str] = None, 
     db: Session = Depends(get_db)
 ):
-    print(f"FETCHING GENERATION: plant={plant_id} start={start} end={end}")
+    logger.info(f"Fetching generation: plant={plant_id} start={start} end={end}")
     plant = get_plant_by_id(plant_id)
     if not plant:
         raise HTTPException(status_code=404, detail="Plant not found")
@@ -34,20 +36,18 @@ def api_get_generation(
             start_dt = datetime.fromisoformat(start_clean).replace(tzinfo=None)
             query = query.filter(GenerationData.timestamp >= start_dt)
         except ValueError as e:
-            print(f"Error parsing start date: {e}")
-            pass
+            raise HTTPException(status_code=422, detail=f"Invalid 'start' timestamp: {start}")
             
     if end:
         try:
             end_clean = end.replace('Z', '+00:00')
             end_dt = datetime.fromisoformat(end_clean).replace(tzinfo=None)
             query = query.filter(GenerationData.timestamp <= end_dt)
-        except ValueError as e:
-            print(f"Error parsing end date: {e}")
-            pass
-            
+        except ValueError:
+            raise HTTPException(status_code=422, detail=f"Invalid 'end' timestamp: {end}")
+
     records = query.order_by(GenerationData.timestamp.asc()).all()
-    print(f"RETURNED {len(records)} records for {plant_id}")
+    logger.info(f"Returned {len(records)} records for {plant_id}")
     
     return [
         {
@@ -83,7 +83,7 @@ def api_get_live(db: Session = Depends(get_db)):
 @router.get("/summary/{plant_id}")
 def api_get_summary(plant_id: str, db: Session = Depends(get_db)):
     """Today's total generation, average prediction accuracy, peak timestamp/value."""
-    now = datetime.now()
+    now = get_now_ist()
     start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     
     records = db.query(GenerationData).filter(
@@ -130,7 +130,7 @@ def api_get_total_summary(plant_type: str, db: Session = Depends(get_db)):
     from src.config.plants import get_plants
     plants = [p for p in get_plants() if p['type'] == plant_type]
     
-    now = datetime.now()
+    now = get_now_ist()
     start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     
     total_kwh = 0
@@ -166,12 +166,13 @@ def api_get_aggregated_generation(
     start_dt = datetime.fromisoformat(start.replace('Z', '+00:00')).replace(tzinfo=None) if start else get_now_ist().replace(hour=0, minute=0, second=0, microsecond=0)
     end_dt = datetime.fromisoformat(end.replace('Z', '+00:00')).replace(tzinfo=None) if end else start_dt + timedelta(days=2)
 
-    # Fetch all records in range, but only actuals up to now
+    # Fetch the whole window (predicted spans past AND future). We keep forecast
+    # rows so the predicted curve extends past "now"; actuals only exist in the
+    # past, so we null them for future timestamps rather than dropping the row.
     now_dt = get_now_ist()
     records = db.query(GenerationData).filter(
         GenerationData.timestamp >= start_dt,
-        GenerationData.timestamp <= end_dt,
-        GenerationData.timestamp <= now_dt
+        GenerationData.timestamp <= end_dt
     ).all()
 
     if not records:
@@ -181,7 +182,7 @@ def api_get_aggregated_generation(
         {
             "timestamp": r.timestamp,
             "plant_id": r.plant_id,
-            "actual_kw": r.actual_kw or 0,
+            "actual_kw": (r.actual_kw or 0) if r.timestamp <= now_dt else 0,
             "predicted_kw": r.predicted_kw or 0,
             "type": next((p['type'] for p in plants if p['id'] == r.plant_id), "solar")
         }
@@ -251,7 +252,7 @@ def api_get_aggregated_generation(
             
         return result
     except Exception as e:
-        print(f"CRITICAL ERROR in aggregation: {e}")
+        logger.error(f"CRITICAL ERROR in aggregation: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
