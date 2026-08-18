@@ -88,6 +88,7 @@ def fetch_historical_weather(plant_id: str, lat: float, lon: float, start_date: 
         "start_date": start_date,
         "end_date": end_date,
         "hourly": "temperature_2m,dewpoint_2m,relative_humidity_2m,surface_pressure,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_speed_80m,wind_speed_100m,wind_speed_120m,wind_direction_10m,shortwave_radiation,direct_normal_irradiance,diffuse_radiation",
+        "wind_speed_unit": "ms",  # Open-Meteo defaults to km/h; models + power curve expect m/s
         "timezone": "Asia/Kolkata"
     }
 
@@ -123,6 +124,7 @@ def fetch_forecast_weather(plant_id: str, lat: float, lon: float, forecast_days:
         "forecast_days": forecast_days,
         "past_days": past_days,
         "hourly": "temperature_2m,dewpoint_2m,relative_humidity_2m,surface_pressure,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_speed_80m,wind_speed_100m,wind_speed_120m,wind_direction_10m,shortwave_radiation,direct_normal_irradiance,diffuse_radiation",
+        "wind_speed_unit": "ms",  # Open-Meteo defaults to km/h; models + power curve expect m/s
         "timezone": "Asia/Kolkata"
     }
 
