@@ -8,16 +8,23 @@ const getInitialBaseUrl = () => {
     // 1. Check for manual environment variable
     if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL;
     
-    // 2. If we are on Render, use your specific backend URL as a safety fallback
+    // 2. Known hosts
     if (typeof window !== "undefined") {
-        if (window.location.hostname.includes("onrender.com")) {
+        const host = window.location.hostname;
+        if (host.includes("onrender.com")) {
             return "https://ecopower-backend.onrender.com";
         }
-        if (window.location.hostname.includes("localhost")) {
+        if (host === "localhost" || host === "127.0.0.1") {
             return "http://localhost:8000";
         }
+        // Unknown host with no VITE_API_BASE_URL: warn loudly instead of silently
+        // pointing at localhost (which would fail on a real deployment).
+        console.error(
+            "[ECO POWER] VITE_API_BASE_URL is not set and host is unrecognized; " +
+            "falling back to http://localhost:8000. Set VITE_API_BASE_URL for this deployment."
+        );
     }
-    
+
     return "http://localhost:8000";
 };
 

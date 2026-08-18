@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { parseISO, format, subHours, addHours } from "date-fns";
+import { parseISO, format } from "date-fns";
 import { API_ENDPOINTS } from "../lib/api";
+import { istWindow } from "../lib/time";
 
 interface ForecastData {
   time: string;
@@ -13,17 +14,16 @@ interface ForecastData {
 export const Forecast = () => {
   const [data, setData] = useState<ForecastData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchForecast = async () => {
       try {
         setLoading(true);
-        const now = new Date();
-        const start = format(subHours(now, 12), "yyyy-MM-dd'T'HH:mm:ss");
-        const end = format(addHours(now, 12), "yyyy-MM-dd'T'HH:mm:ss");
+        const { start, end } = istWindow(12, 12);
 
         const response = await fetch(`${API_ENDPOINTS.GENERATION_AGGREGATE}?start=${start}&end=${end}`);
-        if (!response.ok) throw new Error("Backend unreachable");
+        if (!response.ok) throw new Error(`Backend returned ${response.status}`);
         const raw = await response.json();
         if (!Array.isArray(raw)) throw new Error("Invalid data format");
 
@@ -37,24 +37,12 @@ export const Forecast = () => {
           };
         });
         setData(chartData);
-      } catch (error) {
-        console.warn("Backend unavailable, using mock forecast curves.");
-        const mockData = Array.from({ length: 24 }, (_, i) => {
-          const hour = i;
-          const dayPos = ((hour % 24) - 12) / 6;
-          // Standard solar curve
-          const solar = Math.max(0, Math.exp(-dayPos * dayPos) * 2400);
-          // Fluctuating wind curve
-          const wind = 1200 + Math.sin(hour / 4) * 400 + (Math.random() * 100);
-          return {
-            hour,
-            solar: solar,
-            wind: wind,
-            solarF: solar * (0.95 + Math.random() * 0.1),
-            windF: wind * (0.9 + Math.random() * 0.2)
-          };
-        });
-        setData(mockData);
+        setError(null);
+      } catch (err: any) {
+        // No mock fallback — surface the real state instead of fabricating a curve.
+        console.warn("Forecast fetch failed:", err);
+        setData([]);
+        setError(err?.message || "Backend unreachable");
       } finally {
         setLoading(false);
       }
@@ -242,8 +230,9 @@ export const Forecast = () => {
             </div>
           </>
         ) : (
-          <div className="border border-dashed border-border p-20 text-center text-muted-foreground font-mono text-xs uppercase tracking-widest bg-card">
-            Syncing Karnataka SLDC Generation Baseline...
+          <div className="border border-dashed border-border p-20 text-center text-muted-foreground font-mono text-xs uppercase tracking-widest bg-card flex flex-col gap-2">
+            <span>{loading ? "Syncing Karnataka SLDC Generation Baseline..." : error ? "Unable to reach the forecasting service" : "No forecast data yet"}</span>
+            {!loading && error && <span className="text-[10px] normal-case tracking-normal opacity-70">{error}</span>}
           </div>
         )}
       </div>

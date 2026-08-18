@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Sun, Wind, Activity, TrendingUp } from "lucide-react";
 import { API_ENDPOINTS } from "@/lib/api";
+import { istWindow } from "@/lib/time";
 
 interface GridStatus {
   solar_mw: number;
@@ -14,27 +15,40 @@ export const Dashboard = () => {
   const [status, setStatus] = useState<GridStatus | null>(null);
   const [solarTotal, setSolarTotal] = useState<number | null>(null);
   const [windTotal, setWindTotal] = useState<number | null>(null);
+  const [accuracy, setAccuracy] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const getJson = async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`${url} -> ${res.status}`);
+      return res.json();
+    };
+
     const fetchData = async () => {
-      // Fetch SLDC status
-      fetch(API_ENDPOINTS.SLDC_STATUS)
-        .then(res => res.json())
-        .then(data => setStatus(data))
-        .catch(err => console.warn("SLDC status unavailable"));
+      getJson(API_ENDPOINTS.SLDC_STATUS).then(setStatus).catch(() => console.warn("SLDC status unavailable"));
+      getJson(API_ENDPOINTS.SOLAR_TOTAL).then(d => setSolarTotal(d.total_mwh)).catch(() => console.warn("Solar summary unavailable"));
+      getJson(API_ENDPOINTS.WIND_TOTAL).then(d => setWindTotal(d.total_mwh)).catch(() => console.warn("Wind summary unavailable"));
 
-      // Fetch Solar Total
-      fetch(API_ENDPOINTS.SOLAR_TOTAL)
-        .then(res => res.json())
-        .then(data => setSolarTotal(data.total_mwh))
-        .catch(err => console.warn("Solar summary unavailable"));
-
-      // Fetch Wind Total
-      fetch(API_ENDPOINTS.WIND_TOTAL)
-        .then(res => res.json())
-        .then(data => setWindTotal(data.total_mwh))
-        .catch(err => console.warn("Wind summary unavailable"));
+      // Live forecast accuracy: compare predicted vs actual across today's blocks.
+      const { start } = istWindow(24, 0);
+      getJson(`${API_ENDPOINTS.GENERATION_AGGREGATE}?start=${start}`)
+        .then((rows: any[]) => {
+          const errs: number[] = [];
+          for (const r of rows || []) {
+            const act = (r.solar_actual_kw || 0) + (r.wind_actual_kw || 0);
+            const pred = (r.solar_predicted_kw || 0) + (r.wind_predicted_kw || 0);
+            const denom = Math.max(act, pred);
+            if (denom > 100) errs.push(Math.abs(act - pred) / denom); // ignore near-zero night blocks
+          }
+          if (errs.length) {
+            const mape = errs.reduce((a, b) => a + b, 0) / errs.length;
+            setAccuracy(Math.max(0, Math.min(100, (1 - mape) * 100)));
+          } else {
+            setAccuracy(null);
+          }
+        })
+        .catch(() => console.warn("Aggregate unavailable"));
 
       setLoading(false);
     };
@@ -62,43 +76,23 @@ export const Dashboard = () => {
       delta: "Cumulative Today",
       color: "wind"
     },
-    { icon: TrendingUp, label: "Accuracy", value: "96.0", unit: "%", delta: "R²", color: "emerald" },
+    {
+      icon: TrendingUp,
+      label: "Accuracy",
+      value: accuracy !== null ? accuracy.toFixed(1) : "—",
+      unit: "%",
+      delta: "Predicted vs actual · today",
+      color: "emerald"
+    },
     {
       icon: Activity,
       label: "Frequency",
-      value: (status && status.frequency !== undefined && status.frequency !== null) ? status.frequency.toFixed(2) : "50.00",
+      value: (status && status.frequency !== undefined && status.frequency !== null) ? status.frequency.toFixed(2) : "—",
       unit: "Hz",
-      delta: "Stable",
+      delta: status?.is_stale ? "Stale feed" : "Live",
       color: "primary"
     },
   ];
-
-  // 48 mock points for sparkline
-  const series = (seed: number) =>
-    Array.from({ length: 48 }, (_, i) => {
-      const v = 50 + Math.sin((i + seed) / 4) * 25 + Math.cos((i + seed * 2) / 3) * 12;
-      return Math.max(8, Math.min(95, v));
-    });
-
-  const Sparkline = ({ data, color }: { data: number[]; color: string }) => {
-    const w = 100, h = 28;
-    const max = Math.max(...data), min = Math.min(...data);
-    const pts = data
-      .map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / (max - min || 1)) * h}`)
-      .join(" ");
-    return (
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full h-8">
-        <defs>
-          <linearGradient id={`g-${color}`} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor={`hsl(var(--${color}))`} stopOpacity="0.25" />
-            <stop offset="100%" stopColor={`hsl(var(--${color}))`} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <polyline points={`0,${h} ${pts} ${w},${h}`} fill={`url(#g-${color})`} />
-        <polyline points={pts} fill="none" stroke={`hsl(var(--${color}))`} strokeWidth="1.25" vectorEffect="non-scaling-stroke" />
-      </svg>
-    );
-  };
 
   return (
     <section className="container mx-auto px-6 lg:px-10 pt-12 pb-16">
@@ -124,8 +118,7 @@ export const Dashboard = () => {
                 <span className="font-serif text-5xl">{s.value}</span>
                 <span className="text-sm text-muted-foreground">{s.unit}</span>
               </div>
-              <div className="font-mono text-[11px] mb-4" style={{ color: `hsl(var(--${s.color}))` }}>{s.delta}</div>
-              <Sparkline data={series(i)} color={s.color} />
+              <div className="font-mono text-[11px]" style={{ color: `hsl(var(--${s.color}))` }}>{s.delta}</div>
             </div>
           );
         })}

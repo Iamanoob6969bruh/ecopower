@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { AlertCircle, ArrowDown, ArrowUp, Activity, Sun, Wind, Cloud, Zap, ShieldAlert } from "lucide-react";
 import { format } from "date-fns";
 import { API_ENDPOINTS, getBaseUrl } from "@/lib/api";
+import { istWindow } from "@/lib/time";
 
 interface AnalysisEntry {
   timestamp: string;
@@ -17,20 +18,22 @@ interface AnalysisEntry {
 export const Analysis = () => {
   const [data, setData] = useState<AnalysisEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchAnalysis = async () => {
       try {
-        const now = new Date();
-        const start = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(); // Last 24h
+        const { start } = istWindow(24, 0); // last 24h, IST-naive
         const response = await fetch(`${API_ENDPOINTS.GENERATION_AGGREGATE}?start=${start}`);
-        if (!response.ok) throw new Error("Backend unreachable");
+        if (!response.ok) throw new Error(`Backend returned ${response.status}`);
         const raw = await response.json();
 
         // Take last 24 entries and reverse for newest first
         setData(raw.slice(-24).reverse());
-      } catch (error) {
-        console.warn("Backend unavailable.");
+        setError(null);
+      } catch (err: any) {
+        console.warn("Backend unavailable.", err);
+        setError(err?.message || "Backend unreachable");
       } finally {
         setLoading(false);
       }
@@ -50,16 +53,17 @@ export const Analysis = () => {
   };
 
   const calculateStats = () => {
-    if (data.length === 0) return { stability: "99.8%", deviation: "0.42%", compliance: "100%" };
+    // No fabricated defaults — show dashes until real data is available.
+    if (data.length === 0) return { stability: "—", deviation: "—", compliance: "—" };
 
     const errors = data.map(d => {
-      const actual = d.solar_actual_kw + d.wind_actual_kw;
-      const predicted = d.solar_predicted_kw + d.wind_predicted_kw;
+      const actual = (d.solar_actual_kw || 0) + (d.wind_actual_kw || 0);
+      const predicted = (d.solar_predicted_kw || 0) + (d.wind_predicted_kw || 0);
       return predicted > 0 ? Math.abs(actual - predicted) / predicted : 0;
     });
 
     const avgError = errors.reduce((a, b) => a + b, 0) / errors.length;
-    const stability = (100 - avgError * 10).toFixed(1) + "%";
+    const stability = Math.min(100, Math.max(0, 100 - avgError * 100)).toFixed(1) + "%";
     const deviation = (avgError * 100).toFixed(2) + "%";
     const anomalies = data.filter(d => d.anomalies && d.anomalies.length > 0).length;
     const compliance = (((data.length - anomalies) / data.length) * 100).toFixed(0) + "%";
@@ -100,9 +104,15 @@ export const Analysis = () => {
                     Synchronizing with AI Diagnostic Engine...
                   </td>
                 </tr>
+              ) : (error || data.length === 0) ? (
+                <tr>
+                  <td colSpan={7} className="p-10 text-center text-muted-foreground">
+                    {error ? `Unable to reach the diagnostic service (${error})` : "No diagnostic data available yet."}
+                  </td>
+                </tr>
               ) : data.map((entry, idx) => {
-                const totalActual = (entry.solar_actual_kw + entry.wind_actual_kw) / 1000;
-                const totalPredicted = (entry.solar_predicted_kw + entry.wind_predicted_kw) / 1000;
+                const totalActual = ((entry.solar_actual_kw || 0) + (entry.wind_actual_kw || 0)) / 1000;
+                const totalPredicted = ((entry.solar_predicted_kw || 0) + (entry.wind_predicted_kw || 0)) / 1000;
                 const status = getStatus(totalActual, totalPredicted);
                 const hasAnomalies = entry.anomalies && entry.anomalies.length > 0;
 

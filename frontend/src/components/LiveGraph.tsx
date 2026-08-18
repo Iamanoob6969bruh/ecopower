@@ -9,10 +9,11 @@ import {
   YAxis,
   ReferenceLine
 } from "recharts";
-import { format, parseISO, subHours, addHours, startOfDay, addDays } from "date-fns";
+import { format, parseISO, startOfDay, addDays } from "date-fns";
 import { Activity } from "lucide-react";
 
 import { API_ENDPOINTS } from "../lib/api";
+import { istWindow, istNowMs } from "../lib/time";
 
 export const LiveGraph = ({
   plant_id,
@@ -33,11 +34,9 @@ export const LiveGraph = ({
     const fetchData = async () => {
       try {
         setLoading(true);
-        const now = new Date();
-        // Rolling Window: 12 hours past to 12 hours future
-        // Use local format so backend (now in IST) understands it perfectly
-        const start = format(subHours(now, 12), "yyyy-MM-dd'T'HH:mm:ss");
-        const end = format(addHours(now, 12), "yyyy-MM-dd'T'HH:mm:ss");
+        // Rolling window: 12h past to 12h future, in IST wall-clock (the backend
+        // stores/compares naive-IST), so the window is correct on any host.
+        const { start, end } = istWindow(12, 12);
 
         const response = await fetch(`${API_ENDPOINTS.PLANT_GENERATION(plant_id)}?start=${start}&end=${end}`);
         if (!response.ok) throw new Error("Failed to fetch");
@@ -58,8 +57,9 @@ export const LiveGraph = ({
           setData(formatted);
 
           if (onDataUpdate) {
-            const todayStart = startOfDay(now).getTime();
-            const todayEnd = addDays(startOfDay(now), 1).getTime();
+            const nowLocal = new Date(istNowMs());
+            const todayStart = startOfDay(nowLocal).getTime();
+            const todayEnd = addDays(startOfDay(nowLocal), 1).getTime();
             const todayActuals = formatted.filter((d: any) => d.timestampMs >= todayStart && d.timestampMs < todayEnd && d.actual_kw !== null);
 
             const peak = Math.max(...todayActuals.map((d: any) => d.actual_kw || 0), 0) / 1000;
@@ -86,7 +86,9 @@ export const LiveGraph = ({
     return () => clearInterval(interval);
   }, [plant_id]);
 
-  const nowMs = new Date().getTime();
+  // Match the basis of the parsed data timestamps (IST wall-clock read as local)
+  // so the "now" reference line lands correctly regardless of the viewer's tz.
+  const nowMs = istNowMs();
 
   // Ensure chart data always extends to "now" so the main pointer is visible
   // even if backend hasn't generated data for the current timeslot yet

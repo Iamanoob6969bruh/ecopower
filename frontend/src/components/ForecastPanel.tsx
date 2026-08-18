@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { format, subHours, addHours } from "date-fns";
+import { format } from "date-fns";
 import { API_ENDPOINTS } from "../lib/api";
+import { istWindow } from "../lib/time";
 
 const W = 1000;
 const H = 320;
@@ -9,15 +10,14 @@ const PAD = { l: 64, r: 24, t: 24, b: 36 };
 export const ForecastPanel = () => {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const now = new Date();
-        const start = format(subHours(now, 12), "yyyy-MM-dd'T'HH:mm:ss");
-        const end = format(addHours(now, 12), "yyyy-MM-dd'T'HH:mm:ss");
+        const { start, end } = istWindow(12, 12);
         const response = await fetch(`${API_ENDPOINTS.GENERATION_AGGREGATE}?start=${start}&end=${end}`);
-        if (!response.ok) throw new Error("Failed to fetch");
+        if (!response.ok) throw new Error(`Backend returned ${response.status}`);
         const raw = await response.json();
 
         let cumulativeSolar = 0;
@@ -26,12 +26,11 @@ export const ForecastPanel = () => {
         let cumulativeWindF = 0;
 
         const formatted = raw.map((d: any, i: number) => {
-          // Accumulate energy: each point is 15 mins (0.25h)
-          // kw * 0.25 / 1000 = MWh
-          cumulativeSolar += (d.solar_actual_kw * 0.25) / 1000;
-          cumulativeWind += (d.wind_actual_kw * 0.25) / 1000;
-          cumulativeSolarF += (d.solar_predicted_kw * 0.25) / 1000;
-          cumulativeWindF += (d.wind_predicted_kw * 0.25) / 1000;
+          // Accumulate energy: each point is 15 mins (0.25h). kw * 0.25 / 1000 = MWh
+          cumulativeSolar += ((d.solar_actual_kw || 0) * 0.25) / 1000;
+          cumulativeWind += ((d.wind_actual_kw || 0) * 0.25) / 1000;
+          cumulativeSolarF += ((d.solar_predicted_kw || 0) * 0.25) / 1000;
+          cumulativeWindF += ((d.wind_predicted_kw || 0) * 0.25) / 1000;
 
           return {
             hour: i,
@@ -43,8 +42,10 @@ export const ForecastPanel = () => {
           };
         });
         setData(formatted);
-      } catch (err) {
+        setError(null);
+      } catch (err: any) {
         console.error(err);
+        setError(err?.message || "Failed to load generation data");
       } finally {
         setLoading(false);
       }
@@ -52,11 +53,24 @@ export const ForecastPanel = () => {
     fetchData();
   }, []);
 
-  if (loading || data.length === 0) {
+  if (loading) {
     return (
       <section className="container mx-auto px-6 lg:px-10 pb-16">
         <div className="h-[400px] flex items-center justify-center border border-dashed border-muted-foreground/30 font-mono text-xs uppercase tracking-widest text-muted-foreground">
           Calibrating AI Generation Models...
+        </div>
+      </section>
+    );
+  }
+
+  if (error || data.length === 0) {
+    return (
+      <section className="container mx-auto px-6 lg:px-10 pb-16">
+        <div className="h-[400px] flex flex-col items-center justify-center gap-2 border border-dashed border-muted-foreground/30 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+          <span>{error ? "Unable to reach the forecasting service" : "No generation data yet"}</span>
+          <span className="text-[10px] normal-case tracking-normal opacity-70">
+            {error ? error : "The scheduler may still be populating today's data — check back shortly."}
+          </span>
         </div>
       </section>
     );
@@ -81,7 +95,7 @@ export const ForecastPanel = () => {
         <div className="lg:col-span-2 border border-border bg-card p-6 lg:p-8" style={{ boxShadow: "var(--shadow-soft)" }}>
           <div className="flex items-start justify-between mb-6">
             <div>
-              <div className="font-mono text-[10px] tracking-[0.25em] text-muted-foreground uppercase mb-2">— Cumulative · 48h</div>
+              <div className="font-mono text-[10px] tracking-[0.25em] text-muted-foreground uppercase mb-2">— Cumulative · 24h</div>
               <h3 className="font-serif text-2xl">Total Generation Progress</h3>
               <p className="text-xs text-muted-foreground mt-1">Real-time aggregation of all fleet nodes</p>
             </div>
