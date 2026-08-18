@@ -328,8 +328,10 @@ def save_models(models: dict, plant_type: str) -> None:
         joblib.dump(model, model_path)
         logger.info(f"Model saved: {model_path}")
 
-    # Save the feature list used for this plant type
-    feature_cols = (SOLAR_FEATURES if plant_type == "solar" else WIND_FEATURES) + CATEGORICAL_FEATURES
+    # Save the feature list used for this plant type (de-duplicated — plant_id
+    # already lives in {SOLAR,WIND}_FEATURES, so a naive concat repeated it).
+    base_cols = SOLAR_FEATURES if plant_type == "solar" else WIND_FEATURES
+    feature_cols = list(dict.fromkeys(base_cols + CATEGORICAL_FEATURES))
     meta_path = MODELS_DIR / f"{plant_type}_feature_cols.json"
     with open(meta_path, "w") as f:
         json.dump(feature_cols, f)
