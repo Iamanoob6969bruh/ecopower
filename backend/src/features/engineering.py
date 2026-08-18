@@ -165,17 +165,29 @@ def adjust_wind_speed_to_hub_height(df: pd.DataFrame,
     """
     df = df.copy()
 
-    v80 = df["wind_speed_80m"] if "wind_speed_80m" in df.columns else None
-    v120 = df["wind_speed_120m"] if "wind_speed_120m" in df.columns else None
+    # Gather whatever measured heights are available, tallest first. Data sources
+    # differ: the Open-Meteo *forecast* API gives 80 m + 120 m; the *archive*
+    # (ERA5) API gives only 10 m + 100 m; training NWP has 10 m + 80 m + 120 m.
+    # A column can also be present but all-null (archive returns null 80/120 m),
+    # so require at least one real value.
+    def height_col(name):
+        if name in df.columns and df[name].notna().any():
+            return df[name]
+        return None
 
-    if v80 is None and v120 is None:
-        # Nothing to work with — fall back to whatever single wind we have.
-        if "wind_speed_ms" in df.columns:
-            df["wind_speed_hub_ms"] = df["wind_speed_ms"]
+    candidates = [
+        (120.0, height_col("wind_speed_120m")),
+        (100.0, height_col("wind_speed_100m")),
+        (80.0,  height_col("wind_speed_80m")),
+        (10.0,  height_col("wind_speed_ms")),
+    ]
+    avail = [(h, s) for h, s in candidates if s is not None]
+
+    if not avail:
+        # Nothing usable — leave hub wind absent (downstream fills 0).
         return df
 
-    # Effective hub height: use the plant's hub, default to 100 m when unknown
-    # (e.g. solar rows), so the computation is always well-defined.
+    # Effective hub height: the plant's hub, default 100 m when unknown (solar).
     if "hub_height_m" in df.columns:
         hub_eff = df["hub_height_m"].where(
             df["hub_height_m"].notna() & (df["hub_height_m"] > 0), 100.0
@@ -183,21 +195,22 @@ def adjust_wind_speed_to_hub_height(df: pd.DataFrame,
     else:
         hub_eff = pd.Series(100.0, index=df.index)
 
-    if v80 is not None and v120 is not None:
-        safe80 = v80.clip(lower=0.1)
-        safe120 = v120.clip(lower=0.1)
-        alpha = (np.log(safe120 / safe80) / np.log(120.0 / 80.0))
+    if len(avail) >= 2:
+        # Estimate the shear exponent from the two tallest available heights.
+        (h_hi, s_hi), (h_lo, s_lo) = avail[0], avail[1]
+        safe_hi = s_hi.clip(lower=0.1)
+        safe_lo = s_lo.clip(lower=0.1)
+        alpha = (np.log(safe_hi / safe_lo) / np.log(h_hi / h_lo))
         alpha = alpha.clip(lower=0.0, upper=0.6).fillna(alpha_default)
-        df["wind_speed_hub_ms"] = safe120 * (hub_eff / 120.0) ** alpha
-        # Preserve genuine calm (both heights ~0)
-        df.loc[(v80 <= 0.1) & (v120 <= 0.1), "wind_speed_hub_ms"] = 0.0
+        df["wind_speed_hub_ms"] = safe_hi * (hub_eff / h_hi) ** alpha
+        df.loc[(s_hi <= 0.1) & (s_lo <= 0.1), "wind_speed_hub_ms"] = 0.0
+        logger.info(f"Hub wind from {int(h_lo)}/{int(h_hi)} m profile for {len(df):,} records")
     else:
-        base = v120 if v120 is not None else v80
-        ref = 120.0 if v120 is not None else 80.0
-        df["wind_speed_hub_ms"] = base.clip(lower=0.0) * (hub_eff / ref) ** alpha_default
+        h, s = avail[0]
+        df["wind_speed_hub_ms"] = s.clip(lower=0.0) * (hub_eff / h) ** alpha_default
+        logger.info(f"Hub wind from single {int(h)} m height (default shear) for {len(df):,} records")
 
     df["wind_speed_hub_ms"] = df["wind_speed_hub_ms"].fillna(0.0)
-    logger.info(f"Hub-height wind derived from 80 m / 120 m profile for {len(df):,} records")
     return df
 
 

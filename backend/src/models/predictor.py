@@ -84,12 +84,15 @@ def predict_generation(weather_dict: dict, plant: dict) -> list:
             'humidity_pct': metrics.get('relative_humidity_2m', 50.0),
             'pressure_hpa': metrics.get('surface_pressure', 1013.0),
             'cloud_cover_pct': metrics.get('cloud_cover', 0.0),
-            # Raw 10 m wind. No longer a model feature (the wind model now uses
-            # wind_speed_hub_ms derived from the 80 m / 120 m profile), kept only
-            # for completeness / any non-wind use.
-            'wind_speed_ms': metrics.get('wind_speed_10m', 0.0),
-            'wind_speed_80m': metrics.get('wind_speed_80m', metrics.get('wind_speed_10m', 0.0)),
-            'wind_speed_120m': metrics.get('wind_speed_120m', metrics.get('wind_speed_100m', metrics.get('wind_speed_10m', 0.0))),
+            # Pass every available wind height through as-is (None -> NaN). The
+            # feature pipeline (adjust_wind_speed_to_hub_height) picks the best
+            # available heights to derive hub-height wind — the forecast API gives
+            # 80/120 m, the archive API only 10/100 m. Do NOT coalesce them here or
+            # the shear estimate would use wrong heights.
+            'wind_speed_ms': metrics.get('wind_speed_10m'),        # 10 m
+            'wind_speed_80m': metrics.get('wind_speed_80m'),
+            'wind_speed_100m': metrics.get('wind_speed_100m'),
+            'wind_speed_120m': metrics.get('wind_speed_120m'),
             'wind_direction_deg': metrics.get('wind_direction_10m', 0.0),
             'ghi_wm2': metrics.get('shortwave_radiation', 0.0),
             'plant_id': plant['id'],
@@ -225,78 +228,118 @@ def predict_solar_special(weather_dict: dict, plant: dict) -> list:
     """
     Specialized prediction for solar using the physics-guided synthetic_base_model.txt
     """
-    import lightgbm as lgb
     from pvlib import solarposition, irradiance, atmosphere
-    
+    from pvlib.location import Location
+
     bst = get_model('solar')
     if not bst:
         return []
-        
+
     model_features = bst.feature_name()
-    
+
     # 1. Map raw weather to dataframe
     records = []
     for ts_str, metrics in weather_dict.items():
         records.append({
             'datetime': pd.to_datetime(ts_str),
             'Temperature': metrics.get('temperature_2m', 25.0),
-            'TCC': metrics.get('cloud_cover', 0.0) / 100.0,
-            'GHI_raw': metrics.get('shortwave_radiation', 0.0),
-            'DNI': metrics.get('direct_normal_irradiance', 0.0),
-            'DHI': metrics.get('diffuse_radiation', 0.0),
+            'Dew_Point': metrics.get('dewpoint_2m', 15.0),
+            'Relative_Humidity': metrics.get('relative_humidity_2m', 50.0),
+            'Pressure': metrics.get('surface_pressure', 940.0),
+            'Wind_Speed': metrics.get('wind_speed_10m', 0.0),
+            'TCC': (metrics.get('cloud_cover', 0.0) or 0.0) / 100.0,
+            'Low_Cloud': (metrics.get('cloud_cover_low', 0.0) or 0.0) / 100.0,
+            'Mid_Cloud': (metrics.get('cloud_cover_mid', 0.0) or 0.0) / 100.0,
+            'High_Cloud': (metrics.get('cloud_cover_high', 0.0) or 0.0) / 100.0,
+            'GHI_raw': metrics.get('shortwave_radiation', 0.0) or 0.0,
+            'DNI': metrics.get('direct_normal_irradiance', 0.0) or 0.0,
+            'DHI': metrics.get('diffuse_radiation', 0.0) or 0.0,
         })
-    
+
     df = pd.DataFrame(records).set_index('datetime')
     if df.index.tz is None:
         df.index = df.index.tz_localize('Asia/Kolkata')
     else:
         df.index = df.index.tz_convert('Asia/Kolkata')
-        
-    # 2. Apply Physics Logic from example script.py
+    df.sort_index(inplace=True)   # ensure chronological order before lag/rolling
+
+    # 2. Physics — solar geometry, tilted POA, and clear-sky reference
     lat, lon = plant['latitude'], plant['longitude']
     tilt = plant.get('tilt', 15.0)
     az = plant.get('azimuth', 180.0)
-    
+    loc = Location(lat, lon, altitude=plant.get('altitude', 600))
+
     solpos = solarposition.get_solarposition(df.index, lat, lon)
     df['SZA'] = solpos['zenith']
     df['cos_SZA'] = np.cos(np.radians(df['SZA']))
-    
-    poa = irradiance.get_total_irradiance(
-        surface_tilt=tilt,
-        surface_azimuth=az,
-        solar_zenith=solpos['apparent_zenith'],
-        solar_azimuth=solpos['azimuth'],
-        dni=df['DNI'],
-        ghi=df['GHI_raw'],
-        dhi=df['DHI']
+    df['Solar_Azimuth'] = solpos['azimuth']
+    df['Solar_Elevation'] = solpos['elevation']
+    df['Solar_Declination'] = np.radians(
+        23.45 * np.sin(np.radians(360.0 / 365.0 * (df.index.dayofyear - 81)))
     )
-    df['GHI'] = poa['poa_global'].fillna(0)
-    
+    df['AM_relative'] = atmosphere.get_relative_airmass(solpos['apparent_zenith']).fillna(40.0)
+
+    poa = irradiance.get_total_irradiance(
+        surface_tilt=tilt, surface_azimuth=az,
+        solar_zenith=solpos['apparent_zenith'], solar_azimuth=solpos['azimuth'],
+        dni=df['DNI'], ghi=df['GHI_raw'], dhi=df['DHI'],
+    )
+    df['GHI'] = poa['poa_global'].fillna(0)   # POA is what the model was trained to call "GHI"
+
+    clear = loc.get_clearsky(df.index, model='ineichen')
+    df['GHI_clear'] = clear['ghi']
+    df['DNI_clear'] = clear['dni']
+    df['Clearness_Index'] = np.clip(df['GHI_raw'] / df['GHI_clear'].where(df['GHI_clear'] > 1, np.nan), 0, 1.2).fillna(0)
+
+    # Temporal encodings
+    doy = df.index.dayofyear
     df['hour_sin'] = np.sin(2 * np.pi * df.index.hour / 24)
     df['hour_cos'] = np.cos(2 * np.pi * df.index.hour / 24)
-    df['AM_relative'] = atmosphere.get_relative_airmass(solpos['zenith'])
+    df['doy_sin'] = np.sin(2 * np.pi * doy / 365)
+    df['doy_cos'] = np.cos(2 * np.pi * doy / 365)
+    df['doy_sin2'] = np.sin(4 * np.pi * doy / 365)
+    df['doy_cos2'] = np.cos(4 * np.pi * doy / 365)
+
+    # Lag / rolling / delta features on the (POA) GHI series
     df['GHI_lag1'] = df['GHI'].shift(1).fillna(0)
-    
-    df['rolling_gen_efficiency'] = 0.85 
-    df['rolling_PR_proxy'] = 0.80
+    df['GHI_lag2'] = df['GHI'].shift(2).fillna(0)
+    df['clearness_lag1'] = df['Clearness_Index'].shift(1).fillna(0)
+    df['GHI_rollmean_45m'] = df['GHI'].rolling(3, min_periods=1).mean()
+    df['GHI_rollmean_1h'] = df['GHI'].rolling(4, min_periods=1).mean()
+    df['GHI_rollmean_3h'] = df['GHI'].rolling(12, min_periods=1).mean()
+    df['GHI_rollstd_1h'] = df['GHI'].rolling(4, min_periods=1).std().fillna(0)
+    df['dGHI_dt'] = df['GHI'].diff().fillna(0)
+    df['dTCC_dt'] = df['TCC'].diff().fillna(0)
+
+    # Consecutive dark (near-zero irradiance) steps
+    dark = (df['GHI_raw'] < 10).astype(int)
+    df['Consecutive_dark_steps'] = dark.groupby((dark == 0).cumsum()).cumsum()
+
+    # Signals we have no live source for — set to neutral in-distribution values
+    df['Days_Since_Rain'] = 0.0
     df['Shading_Flag'] = 0
-    
-    # Fill missing features
-    for col in model_features:
-        if col not in df.columns:
+    df['rolling_gen_efficiency'] = 0.038   # training mean (range 0-0.054); prior 0.85 was ~22x OOD
+    df['rolling_PR_proxy'] = 0.75          # training mean ~0.75
+
+    # Any feature still absent (should be none now) -> 0, and log it so gaps are visible
+    missing = [c for c in model_features if c not in df.columns]
+    if missing:
+        logger.warning(f"Solar model features still zero-filled: {missing}")
+        for col in missing:
             df[col] = 0.0
-            
+
+    X = df[model_features].fillna(0.0)
+
     # 3. Inference
-    raw_preds = bst.predict(df[model_features])
-    raw_preds[df['SZA'] > 88] = 0.0 # Night mask
-    
-    # 4. Scaling
-    # The model was likely trained on a 15 MW baseline (e.g. Shivanasamudra)
-    # The previous 50.0 baseline was causing under-prediction by a factor of ~3.3x
-    BASE_MODEL_DC = 15.0 
+    raw_preds = bst.predict(X)
+    raw_preds = np.asarray(raw_preds, dtype=float)
+    raw_preds[df['SZA'].values > 88] = 0.0   # night mask
+
+    # 4. Scale from the model's 50 MW-DC training baseline to this plant
+    BASE_MODEL_DC = 50.0   # the plant the synthetic_base_model was trained on (~41.67 MW AC)
     dc_cap_mw = plant.get('dc_capacity_mw', plant.get('capacity_kw', 1000) / 1000.0 * 1.2)
     ac_cap_mw = plant.get('ac_capacity_mw', plant.get('capacity_kw', 1000) / 1000.0)
-    
+
     scaled_dc_output = (raw_preds / BASE_MODEL_DC) * dc_cap_mw
     live_predicted_mw = np.clip(scaled_dc_output, 0, ac_cap_mw)
     
