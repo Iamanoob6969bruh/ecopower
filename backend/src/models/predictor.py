@@ -84,13 +84,10 @@ def predict_generation(weather_dict: dict, plant: dict) -> list:
             'humidity_pct': metrics.get('relative_humidity_2m', 50.0),
             'pressure_hpa': metrics.get('surface_pressure', 1013.0),
             'cloud_cover_pct': metrics.get('cloud_cover', 0.0),
-            # NOTE: the wind model's dominant feature `wind_speed_ms` was trained on a
-            # column that actually held ~80m wind (in the training data wind_speed_ms
-            # == wind_speed_80m for every row, i.e. no vertical profile). Open-Meteo
-            # gives a real profile where 10m wind is much lower than hub-height wind,
-            # so feeding raw 10m here made the model badly under-predict. Source it
-            # from 80m to match training semantics; fall back to 10m if 80m is absent.
-            'wind_speed_ms': metrics.get('wind_speed_80m', metrics.get('wind_speed_10m', 0.0)),
+            # Raw 10 m wind. No longer a model feature (the wind model now uses
+            # wind_speed_hub_ms derived from the 80 m / 120 m profile), kept only
+            # for completeness / any non-wind use.
+            'wind_speed_ms': metrics.get('wind_speed_10m', 0.0),
             'wind_speed_80m': metrics.get('wind_speed_80m', metrics.get('wind_speed_10m', 0.0)),
             'wind_speed_120m': metrics.get('wind_speed_120m', metrics.get('wind_speed_100m', metrics.get('wind_speed_10m', 0.0))),
             'wind_direction_deg': metrics.get('wind_direction_10m', 0.0),

@@ -58,9 +58,18 @@ a reference-capacity baseline.
 | ![Solar Scatter](images/1.png) | ![Solar Series](images/2.png) |
 
 ### 💨 Wind Model
-LightGBM **quantile** regression (P10 / P50 / P90) with hub-height power-law
-correction and U/V wind-vector decomposition. Cross-validated pinball/RMSE on PLF:
-**P50 CV-RMSE ≈ 0.034**, P10 ≈ 0.041, P90 ≈ 0.044 (see `models/saved/wind_metrics.json`).
+LightGBM **quantile** regression (P10 / P50 / P90) on Plant-Load-Factor. The
+operative wind is the **hub-height wind**, derived per-record from the 80 m and
+120 m NWP wind speeds via a power-law profile (`V_hub = V_120·(hub/120)^α`,
+α = ln(V₁₂₀/V₈₀)/ln(120/80)) — the raw 10 m wind is deliberately **not** used, so
+training and live inference operate on the same physical quantity. Features also
+include U/V wind-vector decomposition, temporal, lag and rolling terms.
+
+- In-sample CV-RMSE (PLF): **P50 ≈ 0.034**, P10 ≈ 0.042, P90 ≈ 0.044
+  (see `models/saved/wind_metrics.json`).
+- **Cross-year holdout** (trained on 2022, tested on unseen 2024 data):
+  RMSE ≈ 0.077, correlation **r ≈ 0.96**, near-unbiased (bias ≈ −0.02).
+
 The live dashboard displays the P50 median.
 
 | Actual vs. Predicted (MW) | Error Distribution (MW) |

@@ -122,15 +122,20 @@ def wind_direction_to_vectors(df: pd.DataFrame) -> pd.DataFrame:
         return df
     df = df.copy()
     wd_rad = np.radians(df["wind_direction_deg"])
-    
+
+    # Speed-weight the vectors with hub-height wind (the operative wind for a
+    # turbine). Requires adjust_wind_speed_to_hub_height to have run first; fall
+    # back to wind_speed_ms only if the hub wind is unavailable.
+    speed = df["wind_speed_hub_ms"] if "wind_speed_hub_ms" in df.columns else df.get("wind_speed_ms", 0.0)
+
     # Vector components (speed-weighted)
-    df["wind_u"] = -df["wind_speed_ms"] * np.sin(wd_rad)
-    df["wind_v"] = -df["wind_speed_ms"] * np.cos(wd_rad)
-    
+    df["wind_u"] = -speed * np.sin(wd_rad)
+    df["wind_v"] = -speed * np.cos(wd_rad)
+
     # Pure cyclical components
     df["wind_dir_sin"] = np.sin(wd_rad)
     df["wind_dir_cos"] = np.cos(wd_rad)
-    
+
     return df
 
 
@@ -138,28 +143,61 @@ def wind_direction_to_vectors(df: pd.DataFrame) -> pd.DataFrame:
 # 3. Hub-Height Wind Speed Correction
 # --------------------------------------------------------------------------- #
 def adjust_wind_speed_to_hub_height(df: pd.DataFrame,
-                                    reference_height: float = NWP_REFERENCE_HEIGHT_M,
-                                    alpha: float = WIND_SHEAR_ALPHA) -> pd.DataFrame:
+                                    alpha_default: float = WIND_SHEAR_ALPHA) -> pd.DataFrame:
     """
-    Correct NWP wind speed from reference height to turbine hub height
-    using the power law wind profile:
+    Estimate wind speed at each plant's turbine hub height.
 
-        V_hub = V_ref * (hub_height / ref_height) ^ alpha
+    Turbines operate at 65-135 m, so the operative wind is the hub-height wind,
+    NOT the 10 m surface wind. We derive it from the NWP wind speeds at 80 m and
+    120 m using the power-law profile:
 
-    For plants without hub_height_m (e.g., solar), the value is left unchanged.
+        V_hub = V_120 * (hub_height / 120) ^ alpha
+
+    where the shear exponent alpha is estimated per-record from the two known
+    heights:  alpha = ln(V_120 / V_80) / ln(120 / 80).
+
+    This replaces the previous approach of extrapolating from a "10 m" wind that,
+    in the training data, was actually the 80 m wind (10 m == 80 m for every row),
+    which caused severe under-prediction once fed real 10 m wind at inference.
+
+    Falls back gracefully when only one height is available, and to the raw
+    wind_speed_ms as a last resort (e.g. malformed input).
     """
-    if "wind_speed_ms" not in df.columns or "hub_height_m" not in df.columns:
+    df = df.copy()
+
+    v80 = df["wind_speed_80m"] if "wind_speed_80m" in df.columns else None
+    v120 = df["wind_speed_120m"] if "wind_speed_120m" in df.columns else None
+
+    if v80 is None and v120 is None:
+        # Nothing to work with — fall back to whatever single wind we have.
+        if "wind_speed_ms" in df.columns:
+            df["wind_speed_hub_ms"] = df["wind_speed_ms"]
         return df
 
-    df = df.copy()
-    has_hub = df["hub_height_m"].notna() & (df["hub_height_m"] > 0)
+    # Effective hub height: use the plant's hub, default to 100 m when unknown
+    # (e.g. solar rows), so the computation is always well-defined.
+    if "hub_height_m" in df.columns:
+        hub_eff = df["hub_height_m"].where(
+            df["hub_height_m"].notna() & (df["hub_height_m"] > 0), 100.0
+        )
+    else:
+        hub_eff = pd.Series(100.0, index=df.index)
 
-    correction = (df.loc[has_hub, "hub_height_m"] / reference_height) ** alpha
-    df.loc[has_hub, "wind_speed_hub_ms"] = df.loc[has_hub, "wind_speed_ms"] * correction
+    if v80 is not None and v120 is not None:
+        safe80 = v80.clip(lower=0.1)
+        safe120 = v120.clip(lower=0.1)
+        alpha = (np.log(safe120 / safe80) / np.log(120.0 / 80.0))
+        alpha = alpha.clip(lower=0.0, upper=0.6).fillna(alpha_default)
+        df["wind_speed_hub_ms"] = safe120 * (hub_eff / 120.0) ** alpha
+        # Preserve genuine calm (both heights ~0)
+        df.loc[(v80 <= 0.1) & (v120 <= 0.1), "wind_speed_hub_ms"] = 0.0
+    else:
+        base = v120 if v120 is not None else v80
+        ref = 120.0 if v120 is not None else 80.0
+        df["wind_speed_hub_ms"] = base.clip(lower=0.0) * (hub_eff / ref) ** alpha_default
 
-    # For plants without hub height, copy raw wind speed
-    df["wind_speed_hub_ms"] = df["wind_speed_hub_ms"].fillna(df["wind_speed_ms"])
-    logger.info(f"Hub-height correction applied to {has_hub.sum():,} records")
+    df["wind_speed_hub_ms"] = df["wind_speed_hub_ms"].fillna(0.0)
+    logger.info(f"Hub-height wind derived from 80 m / 120 m profile for {len(df):,} records")
     return df
 
 
@@ -293,8 +331,8 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     logger.info("Starting feature engineering pipeline...")
 
     df = mask_solar_at_night(df)
+    df = adjust_wind_speed_to_hub_height(df)   # must run before U/V (which uses hub wind)
     df = wind_direction_to_vectors(df)
-    df = adjust_wind_speed_to_hub_height(df)
     df = compute_plf(df)
     df = add_temporal_features(df)
     df = add_lag_features(df)
@@ -322,9 +360,12 @@ SOLAR_FEATURES = [
 ]
 
 WIND_FEATURES = [
-    "wind_speed_hub_ms", "wind_speed_ms", "wind_u", "wind_v",
+    # NOTE: raw 10 m wind (wind_speed_ms) is intentionally excluded. Turbines
+    # operate at hub height; wind_speed_hub_ms is derived from the 80 m / 120 m
+    # profile so training and inference use the same physical quantities.
+    "wind_speed_hub_ms", "wind_u", "wind_v",
     "wind_dir_sin", "wind_dir_cos",
-    "wind_speed_120m", "wind_speed_80m",  # New requested heights
+    "wind_speed_120m", "wind_speed_80m",  # hub-relevant heights
     "temperature_c", "pressure_hpa", "humidity_pct",
     "latitude", "longitude", "hub_height_m", # New location/spec factors
     "hour_sin", "hour_cos", "month_sin", "month_cos", "doy_sin", "doy_cos",
